@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light only">
+<meta name="theme-color" content="#FDFBF3">
+<meta name="darkreader-lock" content="">
+<title>chibi lab. 編集ページ（管理用・非公開推奨）</title>
+
+<!--
+  ============================================================
+  このページについて
+  ------------------------------------------------------------
+  ・イベント情報とギャラリーを、コードを見ずに書き換えられる
+    「編集フォーム」です。
+  ・保存ボタンを押すと、GitHub上の script.js を直接書き換えて
+    本番サイトに反映します（1〜2分で公開サイトに反映されます）。
+  ・このページ自体は index.html / style.css / script.js と同じ
+    リポジトリに admin.html として置いて使います。
+  ・くわしい使い方は README.md を見てください。
+  ============================================================
+-->
+
+<style>
+:root {
+  --paper: #FDFBF3;
+  --paper-alt: #F7F2E4;
+  --ink: #1D2B33;
+  --ink-soft: #4B5A61;
+  --teal: #2A9D8F;
+  --teal-dark: #1F776C;
+  --amber: #F4A340;
+  --magenta: #E85D75;
+  --border: #DDD5C0;
+  --radius: 12px;
+}
+* { box-sizing: border-box; }
+html { background: var(--paper); color-scheme: light only; }
+body {
+  margin: 0;
+  font-family: "Noto Sans JP", sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.7;
+}
+.wrap { max-width: 720px; margin: 0 auto; padding: 28px 20px 80px; }
+
+h1 { font-size: 1.4rem; margin: 0 0 4px; }
+.sub { color: var(--ink-soft); font-size: 0.88rem; margin: 0 0 28px; }
+
+.panel {
+  background: #fff;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 22px;
+  box-shadow: 4px 4px 0 rgba(29,43,51,0.06);
+}
+
+.panel h2 {
+  font-size: 1.02rem;
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge {
+  font-size: 0.7rem;
+  font-family: monospace;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--teal);
+  color: #fff;
+}
+
+label {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin: 12px 0 4px;
+}
+label:first-of-type { margin-top: 0; }
+
+input[type=text], input[type=password], textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  background: var(--paper);
+  color: var(--ink);
+}
+textarea { resize: vertical; min-height: 60px; }
+input:focus, textarea:focus {
+  outline: none;
+  border-color: var(--teal);
+}
+
+.event-card, .gallery-card {
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  position: relative;
+  background: var(--paper-alt);
+}
+
+.remove-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--magenta);
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-family: monospace;
+}
+.remove-btn:hover { text-decoration: underline; }
+
+.add-btn {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  border: 1.5px dashed var(--ink-soft);
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-soft);
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 4px;
+}
+.add-btn:hover { border-color: var(--teal); color: var(--teal-dark); }
+
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.save-bar {
+  position: sticky;
+  bottom: 0;
+  background: var(--paper);
+  border-top: 1.5px solid var(--ink);
+  padding: 14px 20px;
+  margin: 0 -20px -80px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn {
+  padding: 12px 22px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+.btn-primary { background: var(--ink); color: var(--paper); }
+.btn-primary:disabled { opacity: 0.5; cursor: default; }
+
+.status {
+  font-size: 0.85rem;
+  font-family: monospace;
+}
+.status.ok { color: var(--teal-dark); }
+.status.err { color: var(--magenta); }
+.status.busy { color: var(--ink-soft); }
+
+.setup-note {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  background: var(--paper-alt);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+.setup-note a { color: var(--teal-dark); }
+
+details summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin-top: 6px;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>chibi lab. 編集ページ</h1>
+  <p class="sub">イベント情報・ギャラリーをここで編集して、そのまま公開サイトに反映できます。</p>
+
+  <!-- 接続設定 -->
+  <div class="panel">
+    <h2><span class="badge">STEP 1</span> GitHubに接続</h2>
+    <label>リポジトリ（例: youshengyinolai-tech/chibilab-site）</label>
+    <input type="text" id="repoInput" placeholder="ユーザー名/リポジトリ名">
+
+    <label>アクセストークン</label>
+    <input type="password" id="tokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+
+    <details>
+      <summary>トークンって何？どこで作るの？</summary>
+      <div class="setup-note">
+        GitHubの「Settings → Developer settings → Personal access tokens →
+        Fine-grained tokens」から発行できます。<br>
+        このリポジトリだけに絞った権限（Contents: Read and write）で作れば、
+        万一トークンが漏れても他のリポジトリには影響しません。<br>
+        発行したトークンはこのページのブラウザに保存されるだけで、
+        外部には送信されません（GitHub本体との通信のみです）。
+      </div>
+    </details>
+
+    <button class="btn btn-primary" id="connectBtn" style="margin-top:14px;">読み込む</button>
+    <span class="status" id="connectStatus"></span>
+  </div>
+
+  <!-- イベント編集 -->
+  <div class="panel" id="eventsPanel" style="display:none;">
+    <h2><span class="badge" style="background:var(--amber);color:var(--ink);">STEP 2</span> イベント情報</h2>
+    <div id="eventsList"></div>
+    <button class="add-btn" id="addEventBtn">＋ イベントを追加</button>
+  </div>
+
+  <!-- ギャラリー編集 -->
+  <div class="panel" id="galleryPanel" style="display:none;">
+    <h2><span class="badge" style="background:var(--magenta);">STEP 3</span> ギャラリー</h2>
+    <div id="galleryList"></div>
+    <button class="add-btn" id="addPhotoBtn">＋ 写真を追加</button>
+  </div>
+
+  <div class="save-bar" id="saveBar" style="display:none;">
+    <button class="btn btn-primary" id="saveBtn">保存してサイトに反映</button>
+    <span class="status" id="saveStatus"></span>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   このページの仕組み（メモ）
+   ------------------------------------------------------------
+   1. GitHub Contents API で script.js の中身を取得
+   2. EVENTS / GALLERY 配列の部分だけをテキストとして書き換え
+   3. 同じ API で script.js を上書き保存（コミット）
+   4. 数十秒〜数分で GitHub Pages に反映される
+   ============================================================ */
+
+const state = { repo: "", token: "", sha: "", events: [], gallery: [] };
+
+const el = id => document.getElementById(id);
+
+el("connectBtn").addEventListener("click", loadFromGitHub);
+el("addEventBtn").addEventListener("click", () => { state.events.unshift(blankEvent()); renderEvents(); });
+el("addPhotoBtn").addEventListener("click", () => { state.gallery.push(blankPhoto()); renderGallery(); });
+el("saveBtn").addEventListener("click", saveToGitHub);
+
+function blankEvent() {
+  return { date: "", title: "", place: "", body: "" };
+}
+function blankPhoto() {
+  return { image: "", color: "#2A9D8F", caption: "", tilt: 0 };
+}
+
+async function loadFromGitHub() {
+  const repo = el("repoInput").value.trim();
+  const token = el("tokenInput").value.trim();
+  const status = el("connectStatus");
+
+  if (!repo || !token) {
+    status.textContent = "リポジトリとトークンを入力してください";
+    status.className = "status err";
+    return;
+  }
+
+  status.textContent = "読み込み中…";
+  status.className = "status busy";
+
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/contents/script.js`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+      },
+    });
+    if (!res.ok) throw new Error(`GitHubに接続できませんでした（${res.status}）`);
+    const data = await res.json();
+    const content = decodeURIComponent(escape(atob(data.content)));
+
+    state.repo = repo;
+    state.token = token;
+    state.sha = data.sha;
+    state.events = extractArray(content, "EVENTS");
+    state.gallery = extractArray(content, "GALLERY");
+    state.rawContent = content;
+
+    renderEvents();
+    renderGallery();
+    el("eventsPanel").style.display = "block";
+    el("galleryPanel").style.display = "block";
+    el("saveBar").style.display = "flex";
+
+    status.textContent = "読み込み完了 ✓";
+    status.className = "status ok";
+  } catch (e) {
+    status.textContent = "エラー: " + e.message;
+    status.className = "status err";
+  }
+}
+
+// script.js のテキストから EVENTS / GALLERY 配列を抜き出してJSオブジェクトに変換
+function extractArray(content, varName) {
+  const re = new RegExp(`const ${varName} = (\\[[\\s\\S]*?\\]);`);
+  const match = content.match(re);
+  if (!match) return [];
+  // eslint-disable-next-line no-eval
+  return (0, eval)(match[1]);
+}
+
+function renderEvents() {
+  el("eventsList").innerHTML = state.events.map((ev, i) => `
+    <div class="event-card">
+      <button class="remove-btn" data-remove-event="${i}">削除</button>
+      <div class="row2">
+        <div>
+          <label>日付</label>
+          <input type="text" data-ev="${i}" data-field="date" value="${escapeAttr(ev.date)}" placeholder="2026.11.03">
+        </div>
+        <div>
+          <label>場所</label>
+          <input type="text" data-ev="${i}" data-field="place" value="${escapeAttr(ev.place)}" placeholder="としま産業振興プラザ">
+        </div>
+      </div>
+      <label>タイトル</label>
+      <input type="text" data-ev="${i}" data-field="title" value="${escapeAttr(ev.title)}" placeholder="イベント名">
+      <label>説明文</label>
+      <textarea data-ev="${i}" data-field="body" placeholder="どんな内容だったか、簡単に">${escapeHtml(ev.body)}</textarea>
+    </div>
+  `).join("");
+
+  el("eventsList").querySelectorAll("input,textarea").forEach(input => {
+    input.addEventListener("input", e => {
+      const i = e.target.dataset.ev;
+      state.events[i][e.target.dataset.field] = e.target.value;
+    });
+  });
+  el("eventsList").querySelectorAll("[data-remove-event]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      state.events.splice(e.target.dataset.removeEvent, 1);
+      renderEvents();
+    });
+  });
+}
+
+function renderGallery() {
+  el("galleryList").innerHTML = state.gallery.map((g, i) => `
+    <div class="gallery-card">
+      <button class="remove-btn" data-remove-photo="${i}">削除</button>
+      <label>キャプション</label>
+      <input type="text" data-ph="${i}" data-field="caption" value="${escapeAttr(g.caption)}" placeholder="サイエンスショーの様子">
+      <label>画像ファイル名（images/フォルダに入れたファイル名。空欄なら色プレースホルダー）</label>
+      <input type="text" data-ph="${i}" data-field="image" value="${escapeAttr(g.image)}" placeholder="images/event01.jpg">
+    </div>
+  `).join("");
+
+  el("galleryList").querySelectorAll("input").forEach(input => {
+    input.addEventListener("input", e => {
+      const i = e.target.dataset.ph;
+      state.gallery[i][e.target.dataset.field] = e.target.value;
+    });
+  });
+  el("galleryList").querySelectorAll("[data-remove-photo]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      state.gallery.splice(e.target.dataset.removePhoto, 1);
+      renderGallery();
+    });
+  });
+}
+
+function escapeHtml(s) { return (s || "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+function escapeAttr(s) { return (s || "").replace(/"/g, "&quot;"); }
+
+async function saveToGitHub() {
+  const status = el("saveStatus");
+  el("saveBtn").disabled = true;
+  status.textContent = "保存中…";
+  status.className = "status busy";
+
+  try {
+    const newEventsBlock = "const EVENTS = " + JSON.stringify(state.events, null, 2) + ";";
+    const newGalleryBlock = "const GALLERY = " + JSON.stringify(state.gallery, null, 2) + ";";
+
+    let newContent = state.rawContent
+      .replace(/const EVENTS = \[[\s\S]*?\];/, newEventsBlock)
+      .replace(/const GALLERY = \[[\s\S]*?\];/, newGalleryBlock);
+
+    const b64 = btoa(unescape(encodeURIComponent(newContent)));
+
+    const res = await fetch(`https://api.github.com/repos/${state.repo}/contents/script.js`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${state.token}`,
+        Accept: "application/vnd.github+json",
+      },
+      body: JSON.stringify({
+        message: "サイト内容を更新（編集ページより）",
+        content: b64,
+        sha: state.sha,
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.message || `保存に失敗しました（${res.status}）`);
+    }
+
+    const data = await res.json();
+    state.sha = data.content.sha;
+    state.rawContent = newContent;
+
+    status.textContent = "保存しました ✓（数分でサイトに反映されます）";
+    status.className = "status ok";
+  } catch (e) {
+    status.textContent = "エラー: " + e.message;
+    status.className = "status err";
+  } finally {
+    el("saveBtn").disabled = false;
+  }
+}
+</script>
+</body>
+</html>
