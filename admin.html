@@ -213,22 +213,17 @@ input:focus, textarea:focus {
 .drag-handle {
   cursor: grab;
   display: inline-block;
-  padding: 2px 6px;
+  padding: 6px 10px;
   margin-right: 6px;
   border-radius: 4px;
   color: var(--ink-soft);
   font-size: 0.95rem;
   user-select: none;
   vertical-align: middle;
+  touch-action: none;
 }
 .drag-handle:hover { background: var(--border); color: var(--ink); }
 .drag-handle:active { cursor: grabbing; }
-
-.event-card, .gallery-card, .section-card { cursor: default; }
-.event-card.drag-over, .gallery-card.drag-over, .section-card.drag-over {
-  outline: 2px dashed var(--teal);
-  outline-offset: 3px;
-}
 
 .status {
   font-size: 0.85rem;
@@ -484,8 +479,66 @@ function renderAll() {
   renderSections();
 }
 
-// カード一覧のドラッグ並び替え・削除・入力を、毎回の再描画で再登録しなくて
-// 済むよう、リストの外枠（container）にイベント委任でまとめて設定する
+/* ============================================================
+   ドラッグ並び替え（Pointer Events版）
+   ------------------------------------------------------------
+   HTML5標準のドラッグ&ドロップAPIはスマホ・タブレットのタッチ操作では
+   動かないブラウザが多いため、マウスもタッチも同じ仕組みで扱える
+   Pointer Events（pointerdown/pointermove/pointerup）で自作している。
+   ドラッグ中、指やカーソルが別のカードの上を通過するたびに、その場で
+   配列を入れ替えて再描画する（Trelloのカード並び替えと同じ方式）。
+   ============================================================ */
+function makeSortable(container, handleSelector, cardSelector, getLocation, rerender) {
+  container.addEventListener("pointerdown", e => {
+    const handle = e.target.closest(handleSelector);
+    if (!handle) return;
+    const card = handle.closest(cardSelector);
+    if (!card || !container.contains(card)) return;
+
+    e.preventDefault();
+    pushHistory();
+
+    const startLoc = getLocation(card);
+    const draggedItem = startLoc.list[startLoc.index];
+    let moved = false;
+
+    function onMove(ev) {
+      const elAtPoint = document.elementFromPoint(ev.clientX, ev.clientY);
+      const overCard = elAtPoint && elAtPoint.closest(cardSelector);
+      if (!overCard || !container.contains(overCard)) return;
+
+      const overLoc = getLocation(overCard);
+      // 別のセクションの項目や、別リストへは移動できないようにする
+      if (overLoc.list !== startLoc.list) return;
+
+      const curList = overLoc.list;
+      const curIndex = curList.indexOf(draggedItem);
+      if (curIndex === -1) return;
+      if (overLoc.index === curIndex) return;
+
+      curList.splice(curIndex, 1);
+      curList.splice(overLoc.index, 0, draggedItem);
+      moved = true;
+      rerender();
+    }
+
+    function onUp() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      if (!moved) {
+        // 何も動かなかった場合は、直前に積んだ履歴を取り消しておく
+        historyStack.pop();
+        updateHistoryButtons();
+      }
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  });
+}
+
+// カード一覧の削除・入力を、毎回の再描画で再登録しなくて済むよう、
+// リストの外枠（container）にイベント委任でまとめて設定する
 function setupListEditor(container, getArray, rerender) {
   container.addEventListener("input", e => {
     const idx = e.target.dataset.idx;
@@ -502,41 +555,10 @@ function setupListEditor(container, getArray, rerender) {
     rerender();
   });
 
-  let dragSrc = null;
-
-  container.addEventListener("dragstart", e => {
-    if (!e.target.classList.contains("drag-handle")) return;
-    const card = e.target.closest("[data-idx]");
-    if (!card) return;
-    dragSrc = Number(card.dataset.idx);
-    e.dataTransfer.effectAllowed = "move";
-  });
-
-  container.addEventListener("dragenter", e => {
-    const card = e.target.closest("[data-idx]");
-    if (card) card.classList.add("drag-over");
-  });
-  container.addEventListener("dragleave", e => {
-    const card = e.target.closest("[data-idx]");
-    if (card) card.classList.remove("drag-over");
-  });
-  container.addEventListener("dragover", e => e.preventDefault());
-
-  container.addEventListener("drop", e => {
-    e.preventDefault();
-    container.querySelectorAll(".drag-over").forEach(c => c.classList.remove("drag-over"));
-    const card = e.target.closest("[data-idx]");
-    if (!card || dragSrc === null) return;
-    const dropIdx = Number(card.dataset.idx);
-    if (dropIdx !== dragSrc) {
-      pushHistory();
-      const arr = getArray();
-      const [item] = arr.splice(dragSrc, 1);
-      arr.splice(dropIdx, 0, item);
-      rerender();
-    }
-    dragSrc = null;
-  });
+  makeSortable(container, ".drag-handle", "[data-idx]", card => ({
+    list: getArray(),
+    index: Number(card.dataset.idx),
+  }), rerender);
 }
 
 SITE_FIELDS.forEach(key => {
@@ -649,7 +671,7 @@ function renderSite() {
 function renderTopics() {
   el("topicsList").innerHTML = state.topics.map((t, i) => `
     <div class="event-card" data-idx="${i}">
-      <span class="drag-handle" draggable="true" title="ドラッグで並び替え">⠿⠿</span>
+      <span class="drag-handle" title="ドラッグで並び替え">⠿⠿</span>
       <button class="remove-btn" data-remove="${i}">削除</button>
       <label>日付</label>
       <input type="text" data-idx="${i}" data-field="date" value="${escapeAttr(t.date)}" placeholder="2026.08.13">
@@ -666,7 +688,7 @@ function renderTopics() {
 function renderEvents() {
   el("eventsList").innerHTML = state.events.map((ev, i) => `
     <div class="event-card" data-idx="${i}">
-      <span class="drag-handle" draggable="true" title="ドラッグで並び替え">⠿⠿</span>
+      <span class="drag-handle" title="ドラッグで並び替え">⠿⠿</span>
       <button class="remove-btn" data-remove="${i}">削除</button>
       <div class="row2">
         <div>
@@ -689,7 +711,7 @@ function renderEvents() {
 function renderGallery() {
   el("galleryList").innerHTML = state.gallery.map((g, i) => `
     <div class="gallery-card" data-idx="${i}">
-      <span class="drag-handle" draggable="true" title="ドラッグで並び替え">⠿⠿</span>
+      <span class="drag-handle" title="ドラッグで並び替え">⠿⠿</span>
       <button class="remove-btn" data-remove="${i}">削除</button>
       <label>キャプション</label>
       <input type="text" data-idx="${i}" data-field="caption" value="${escapeAttr(g.caption)}" placeholder="サイエンスショーの様子">
@@ -702,7 +724,7 @@ function renderGallery() {
 function renderSections() {
   el("sectionsList").innerHTML = state.sections.map((s, si) => `
     <div class="section-card" data-section-idx="${si}">
-      <span class="drag-handle section-drag-handle" draggable="true" title="ドラッグでセクションを並び替え">⠿⠿</span>
+      <span class="drag-handle section-drag-handle" title="ドラッグでセクションを並び替え">⠿⠿</span>
       <button class="remove-btn" data-remove-section="${si}">セクションごと削除</button>
       <label>ナビゲーションの表示名（英字推奨。例: CRAFT）</label>
       <input type="text" data-sec="${si}" data-field="navLabel" value="${escapeAttr(s.navLabel)}" placeholder="CRAFT">
@@ -715,7 +737,7 @@ function renderSections() {
       <div class="items-editor">
         ${s.items.map((it, ii) => `
           <div class="event-card" data-item-idx="${ii}" data-section-idx-for-item="${si}">
-            <span class="drag-handle item-drag-handle" draggable="true" title="ドラッグで項目を並び替え">⠿⠿</span>
+            <span class="drag-handle item-drag-handle" title="ドラッグで項目を並び替え">⠿⠿</span>
             <button class="remove-btn" data-remove-item="${si}:${ii}">削除</button>
             <label>タイトル</label>
             <input type="text" data-it="${si}:${ii}" data-field="title" value="${escapeAttr(it.title)}" placeholder="項目タイトル">
@@ -764,67 +786,17 @@ function setupSectionsEditor() {
     }
   });
 
-  let dragSrcSection = null;
-  let dragSrcItem = null;
+  // セクションそのものの並び替え
+  makeSortable(container, ".section-drag-handle", "[data-section-idx]", card => ({
+    list: state.sections,
+    index: Number(card.dataset.sectionIdx),
+  }), renderSections);
 
-  container.addEventListener("dragstart", e => {
-    if (e.target.classList.contains("section-drag-handle")) {
-      const card = e.target.closest("[data-section-idx]");
-      if (!card) return;
-      dragSrcSection = Number(card.dataset.sectionIdx);
-      dragSrcItem = null;
-    } else if (e.target.classList.contains("item-drag-handle")) {
-      const card = e.target.closest("[data-item-idx]");
-      if (!card) return;
-      dragSrcItem = { si: Number(card.dataset.sectionIdxForItem), ii: Number(card.dataset.itemIdx) };
-      dragSrcSection = null;
-    }
-    e.dataTransfer.effectAllowed = "move";
-  });
-
-  container.addEventListener("dragenter", e => {
-    const itemCard = e.target.closest("[data-item-idx]");
-    const sectionCard = e.target.closest("[data-section-idx]");
-    if (itemCard) itemCard.classList.add("drag-over");
-    else if (sectionCard) sectionCard.classList.add("drag-over");
-  });
-  container.addEventListener("dragleave", e => {
-    const card = e.target.closest("[data-item-idx], [data-section-idx]");
-    if (card) card.classList.remove("drag-over");
-  });
-  container.addEventListener("dragover", e => e.preventDefault());
-
-  container.addEventListener("drop", e => {
-    e.preventDefault();
-    container.querySelectorAll(".drag-over").forEach(c => c.classList.remove("drag-over"));
-
-    if (dragSrcItem !== null) {
-      const card = e.target.closest("[data-item-idx]");
-      dragSrcSection = null;
-      if (!card) { dragSrcItem = null; return; }
-      const targetSi = Number(card.dataset.sectionIdxForItem);
-      const targetIi = Number(card.dataset.itemIdx);
-      if (targetSi === dragSrcItem.si && targetIi !== dragSrcItem.ii) {
-        pushHistory();
-        const items = state.sections[targetSi].items;
-        const [item] = items.splice(dragSrcItem.ii, 1);
-        items.splice(targetIi, 0, item);
-        renderSections();
-      }
-      dragSrcItem = null;
-    } else if (dragSrcSection !== null) {
-      const card = e.target.closest("[data-section-idx]");
-      if (!card) { dragSrcSection = null; return; }
-      const dropIdx = Number(card.dataset.sectionIdx);
-      if (dropIdx !== dragSrcSection) {
-        pushHistory();
-        const [item] = state.sections.splice(dragSrcSection, 1);
-        state.sections.splice(dropIdx, 0, item);
-        renderSections();
-      }
-      dragSrcSection = null;
-    }
-  });
+  // セクション内の項目の並び替え（同じセクションの中でのみ動く）
+  makeSortable(container, ".item-drag-handle", "[data-item-idx]", card => {
+    const si = Number(card.dataset.sectionIdxForItem);
+    return { list: state.sections[si].items, index: Number(card.dataset.itemIdx) };
+  }, renderSections);
 }
 
 // ナビ表示名からURL用のIDを作る（例: "工作紹介" → "section-1"、"Craft Ideas" → "craft-ideas"）
