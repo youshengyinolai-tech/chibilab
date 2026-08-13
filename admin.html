@@ -13,8 +13,8 @@
   ============================================================
   このページについて
   ------------------------------------------------------------
-  ・イベント情報とギャラリーを、コードを見ずに書き換えられる
-    「編集フォーム」です。
+  ・サイトの文言（ヒーロー・ABOUT・お問い合わせ）、お知らせ、イベント情報、
+    ギャラリーを、コードを見ずに書き換えられる「編集フォーム」です。
   ・保存ボタンを押すと、GitHub上の script.js を直接書き換えて
     本番サイトに反映します（1〜2分で公開サイトに反映されます）。
   ・このページ自体は index.html / style.css / script.js と同じ
@@ -190,7 +190,7 @@ details summary {
 <body>
 <div class="wrap">
   <h1>chibi lab. 編集ページ</h1>
-  <p class="sub">イベント情報・ギャラリーをここで編集して、そのまま公開サイトに反映できます。</p>
+  <p class="sub">サイトの文言・お知らせ・イベント情報・ギャラリーをここで編集して、そのまま公開サイトに反映できます。</p>
 
   <!-- 接続設定 -->
   <div class="panel">
@@ -217,16 +217,67 @@ details summary {
     <span class="status" id="connectStatus"></span>
   </div>
 
+  <!-- サイト文言編集 -->
+  <div class="panel" id="sitePanel" style="display:none;">
+    <h2><span class="badge">STEP 2</span> サイト全体の文言</h2>
+
+    <label>団体名（見出し上部の小さい文字）</label>
+    <input type="text" id="site-heroOrg">
+
+    <label>読み仮名（「chibi lab.」の後ろにつく文字）</label>
+    <input type="text" id="site-heroKana">
+
+    <label>キャッチコピー</label>
+    <input type="text" id="site-heroTagline">
+
+    <label>ヒーローの説明文</label>
+    <textarea id="site-heroLead"></textarea>
+
+    <label>ABOUT本文（1段落目）</label>
+    <textarea id="site-aboutBody1"></textarea>
+
+    <label>ABOUT本文（2段落目）</label>
+    <textarea id="site-aboutBody2"></textarea>
+
+    <label>ABOUTの活動ポイント（3つ）</label>
+    <input type="text" id="site-aboutPoint1" style="margin-bottom:8px;">
+    <input type="text" id="site-aboutPoint2" style="margin-bottom:8px;">
+    <input type="text" id="site-aboutPoint3">
+
+    <label>お問い合わせ本文</label>
+    <textarea id="site-contactBody"></textarea>
+
+    <label>お問い合わせメールアドレス</label>
+    <input type="text" id="site-contactEmail">
+
+    <label>お問い合わせフォームURL</label>
+    <input type="text" id="site-contactFormUrl">
+
+    <label>X（Twitter）URL</label>
+    <input type="text" id="site-snsX" style="margin-bottom:8px;">
+    <label>Instagram URL</label>
+    <input type="text" id="site-snsInstagram" style="margin-bottom:8px;">
+    <label>YouTube URL</label>
+    <input type="text" id="site-snsYoutube">
+  </div>
+
+  <!-- お知らせ編集 -->
+  <div class="panel" id="topicsPanel" style="display:none;">
+    <h2><span class="badge" style="background:var(--amber);color:var(--ink);">STEP 3</span> お知らせ</h2>
+    <div id="topicsList"></div>
+    <button class="add-btn" id="addTopicBtn">＋ お知らせを追加</button>
+  </div>
+
   <!-- イベント編集 -->
   <div class="panel" id="eventsPanel" style="display:none;">
-    <h2><span class="badge" style="background:var(--amber);color:var(--ink);">STEP 2</span> イベント情報</h2>
+    <h2><span class="badge" style="background:var(--magenta);">STEP 4</span> イベント情報</h2>
     <div id="eventsList"></div>
     <button class="add-btn" id="addEventBtn">＋ イベントを追加</button>
   </div>
 
   <!-- ギャラリー編集 -->
   <div class="panel" id="galleryPanel" style="display:none;">
-    <h2><span class="badge" style="background:var(--magenta);">STEP 3</span> ギャラリー</h2>
+    <h2><span class="badge">STEP 5</span> ギャラリー</h2>
     <div id="galleryList"></div>
     <button class="add-btn" id="addPhotoBtn">＋ 写真を追加</button>
   </div>
@@ -242,20 +293,37 @@ details summary {
    このページの仕組み（メモ）
    ------------------------------------------------------------
    1. GitHub Contents API で script.js の中身を取得
-   2. EVENTS / GALLERY 配列の部分だけをテキストとして書き換え
+   2. SITE / TOPICS / EVENTS / GALLERY の部分だけをテキストとして書き換え
    3. 同じ API で script.js を上書き保存（コミット）
    4. 数十秒〜数分で GitHub Pages に反映される
    ============================================================ */
 
-const state = { repo: "", token: "", sha: "", events: [], gallery: [] };
+const SITE_FIELDS = [
+  "heroOrg", "heroKana", "heroTagline", "heroLead",
+  "aboutBody1", "aboutBody2", "aboutPoint1", "aboutPoint2", "aboutPoint3",
+  "contactBody", "contactEmail", "contactFormUrl",
+  "snsX", "snsInstagram", "snsYoutube",
+];
+
+const state = { repo: "", token: "", sha: "", site: {}, topics: [], events: [], gallery: [] };
 
 const el = id => document.getElementById(id);
 
 el("connectBtn").addEventListener("click", loadFromGitHub);
+el("addTopicBtn").addEventListener("click", () => { state.topics.unshift(blankTopic()); renderTopics(); });
 el("addEventBtn").addEventListener("click", () => { state.events.unshift(blankEvent()); renderEvents(); });
 el("addPhotoBtn").addEventListener("click", () => { state.gallery.push(blankPhoto()); renderGallery(); });
 el("saveBtn").addEventListener("click", saveToGitHub);
 
+SITE_FIELDS.forEach(key => {
+  el("site-" + key).addEventListener("input", e => {
+    state.site[key] = e.target.value;
+  });
+});
+
+function blankTopic() {
+  return { date: "", title: "", body: "" };
+}
 function blankEvent() {
   return { date: "", title: "", place: "", body: "" };
 }
@@ -291,12 +359,18 @@ async function loadFromGitHub() {
     state.repo = repo;
     state.token = token;
     state.sha = data.sha;
+    state.site = extractObject(content, "SITE");
+    state.topics = extractArray(content, "TOPICS");
     state.events = extractArray(content, "EVENTS");
     state.gallery = extractArray(content, "GALLERY");
     state.rawContent = content;
 
+    renderSite();
+    renderTopics();
     renderEvents();
     renderGallery();
+    el("sitePanel").style.display = "block";
+    el("topicsPanel").style.display = "block";
     el("eventsPanel").style.display = "block";
     el("galleryPanel").style.display = "block";
     el("saveBar").style.display = "flex";
@@ -309,13 +383,55 @@ async function loadFromGitHub() {
   }
 }
 
-// script.js のテキストから EVENTS / GALLERY 配列を抜き出してJSオブジェクトに変換
+// script.js のテキストから TOPICS / EVENTS / GALLERY 配列を抜き出してJSオブジェクトに変換
 function extractArray(content, varName) {
   const re = new RegExp(`const ${varName} = (\\[[\\s\\S]*?\\]);`);
   const match = content.match(re);
   if (!match) return [];
   // eslint-disable-next-line no-eval
   return (0, eval)(match[1]);
+}
+
+// script.js のテキストから SITE オブジェクトを抜き出してJSオブジェクトに変換
+function extractObject(content, varName) {
+  const re = new RegExp(`const ${varName} = (\\{[\\s\\S]*?\\});`);
+  const match = content.match(re);
+  if (!match) return {};
+  // eslint-disable-next-line no-eval
+  return (0, eval)("(" + match[1] + ")");
+}
+
+function renderSite() {
+  SITE_FIELDS.forEach(key => {
+    el("site-" + key).value = state.site[key] || "";
+  });
+}
+
+function renderTopics() {
+  el("topicsList").innerHTML = state.topics.map((t, i) => `
+    <div class="event-card">
+      <button class="remove-btn" data-remove-topic="${i}">削除</button>
+      <label>日付</label>
+      <input type="text" data-tp="${i}" data-field="date" value="${escapeAttr(t.date)}" placeholder="2026.08.13">
+      <label>タイトル</label>
+      <input type="text" data-tp="${i}" data-field="title" value="${escapeAttr(t.title)}" placeholder="お知らせのタイトル">
+      <label>本文</label>
+      <textarea data-tp="${i}" data-field="body" placeholder="お知らせの内容">${escapeHtml(t.body)}</textarea>
+    </div>
+  `).join("");
+
+  el("topicsList").querySelectorAll("input,textarea").forEach(input => {
+    input.addEventListener("input", e => {
+      const i = e.target.dataset.tp;
+      state.topics[i][e.target.dataset.field] = e.target.value;
+    });
+  });
+  el("topicsList").querySelectorAll("[data-remove-topic]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      state.topics.splice(e.target.dataset.removeTopic, 1);
+      renderTopics();
+    });
+  });
 }
 
 function renderEvents() {
@@ -388,10 +504,14 @@ async function saveToGitHub() {
   status.className = "status busy";
 
   try {
+    const newSiteBlock = "const SITE = " + JSON.stringify(state.site, null, 2) + ";";
+    const newTopicsBlock = "const TOPICS = " + JSON.stringify(state.topics, null, 2) + ";";
     const newEventsBlock = "const EVENTS = " + JSON.stringify(state.events, null, 2) + ";";
     const newGalleryBlock = "const GALLERY = " + JSON.stringify(state.gallery, null, 2) + ";";
 
     let newContent = state.rawContent
+      .replace(/const SITE = \{[\s\S]*?\};/, newSiteBlock)
+      .replace(/const TOPICS = \[[\s\S]*?\];/, newTopicsBlock)
       .replace(/const EVENTS = \[[\s\S]*?\];/, newEventsBlock)
       .replace(/const GALLERY = \[[\s\S]*?\];/, newGalleryBlock);
 

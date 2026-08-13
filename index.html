@@ -16,8 +16,9 @@
   このファイルについて（後任の方へ）
   ============================================
   ・見た目(色・フォント・レイアウト)は style.css にまとまっています。
-  ・イベント情報やギャラリーの写真キャプションなど「よく更新する文章」は
-    script.js の一番上にリスト形式でまとめてあります。
+  ・ヒーローの文言、ABOUT本文、お知らせ(TOPICS)、イベント情報、ギャラリーの
+    写真キャプション、お問い合わせ文言など「よく更新する文章」は
+    script.js の一番上に SITE / TOPICS / EVENTS / GALLERY としてまとめてあります。
     HTMLをいじらなくても script.js の中身を書き換えるだけで反映されます。
   ・くわしい更新手順は README.md を見てください。
   ============================================
@@ -41,6 +42,7 @@
   </a>
   <nav class="site-nav">
     <a href="#about">ABOUT</a>
+    <a href="#topics">TOPICS</a>
     <a href="#events">EVENTS</a>
     <a href="#gallery">GALLERY</a>
     <a href="#contact">CONTACT</a>
@@ -55,9 +57,9 @@
   <!-- ヒーロー -->
   <section class="hero">
     <div class="hero-text">
-      <h1><span class="hero-org">東京理科大学 サイエンスコミュニケーションサークル</span>chibi lab.<span class="hero-kana">（ちびラボ）</span></h1>
-      <p class="hero-tagline">むずかしそうを、おもしろそうに。</p>
-      <p class="hero-lead">
+      <h1><span class="hero-org" id="hero-org">東京理科大学 サイエンスコミュニケーションサークル</span>chibi lab.<span class="hero-kana" id="hero-kana">（ちびラボ）</span></h1>
+      <p class="hero-tagline" id="hero-tagline">むずかしそうを、おもしろそうに。</p>
+      <p class="hero-lead" id="hero-lead">
         実験や工作、サイエンスショーを通じて、子どもたちに
         「科学っておもしろい」を届ける学生サークルです。
       </p>
@@ -81,27 +83,40 @@
 
     <div class="notebook-card about-card">
       <div class="sticky-note">実験ノート<br>より抜粋</div>
-      <p>
+      <p id="about-body-1">
         chibi lab. は、2012年10月に東京理科大学の学生10名で発足した
         サイエンスコミュニケーションサークルです。科学館や図書館、地域のお祭りなどに
         出展し、実験ショーや工作教室を通じて子どもたちと科学のふれあいをつくっています。
       </p>
-      <p>
+      <p id="about-body-2">
         そんなモットーのもと、大学で学んだ知識を分かりやすく・楽しく届ける方法を、
         部員同士で日々研究しています。所属大学・学年を問わず、部員は随時募集中です。
       </p>
       <ul class="about-points">
-        <li><span class="dot dot-teal"></span>科学館・図書館でのサイエンスショー出展</li>
-        <li><span class="dot dot-amber"></span>工作イベント・ワークショップの企画運営</li>
-        <li><span class="dot dot-magenta"></span>YouTube・SNSでの科学コンテンツ発信</li>
+        <li><span class="dot dot-teal"></span><span id="about-point-1">科学館・図書館でのサイエンスショー出展</span></li>
+        <li><span class="dot dot-amber"></span><span id="about-point-2">工作イベント・ワークショップの企画運営</span></li>
+        <li><span class="dot dot-magenta"></span><span id="about-point-3">YouTube・SNSでの科学コンテンツ発信</span></li>
       </ul>
     </div>
   </section>
 
-  <!-- EVENTS -->
-  <section id="events" class="section section-alt">
+  <!-- TOPICS -->
+  <section id="topics" class="section section-alt">
     <div class="section-head">
-      <span class="tag tag-amber">02 / EVENTS</span>
+      <span class="tag tag-magenta">02 / TOPICS</span>
+      <h2>お知らせ</h2>
+    </div>
+    <p class="section-note">新しいお知らせはここに追加されます（更新は script.js の TOPICS リストで行います）</p>
+
+    <div id="topics-list" class="events-list">
+      <!-- JSで自動生成されます -->
+    </div>
+  </section>
+
+  <!-- EVENTS -->
+  <section id="events" class="section">
+    <div class="section-head">
+      <span class="tag tag-amber">03 / EVENTS</span>
       <h2>活動記録</h2>
     </div>
     <p class="section-note">最新のイベントはここに追加されます（更新は script.js の EVENTS リストで行います）</p>
@@ -114,7 +129,7 @@
   <!-- GALLERY -->
   <section id="gallery" class="section">
     <div class="section-head">
-      <span class="tag tag-magenta">03 / GALLERY</span>
+      <span class="tag tag-magenta">04 / GALLERY</span>
       <h2>活動フォト</h2>
     </div>
     <p class="section-note">写真を追加する場合は images フォルダに入れて script.js でファイル名を指定してください</p>
@@ -127,24 +142,24 @@
   <!-- CONTACT -->
   <section id="contact" class="section section-alt">
     <div class="section-head">
-      <span class="tag tag-teal">04 / CONTACT</span>
+      <span class="tag tag-teal">05 / CONTACT</span>
       <h2>お問い合わせ</h2>
     </div>
 
     <div class="notebook-card contact-card">
       <img class="contact-mascot" src="images/brand/mascot-odoroki.png" alt="" width="88" height="150">
-      <p>
+      <p id="contact-body">
         実験教室・サイエンスショーのご依頼は、日時・場所・対象学年・人数などを明記のうえ
         メールでご連絡ください（希望日の1〜2ヶ月前を目安にお願いします）。<br>
         取材やその他のお問い合わせは、下記フォームからどうぞ。
       </p>
-      <p><a href="mailto:chibi.lab.chibi@gmail.com">chibi.lab.chibi@gmail.com</a></p>
-      <a href="https://docs.google.com/forms/d/e/1FAIpQLSfsTu5M_ln2tvkn-N3_2mbyWaHF6K3KrXiTiSE6LW2xmBJP7Q/viewform" class="btn btn-primary contact-btn" target="_blank" rel="noopener">お問い合わせフォーム</a>
+      <p><a href="mailto:chibi.lab.chibi@gmail.com" id="contact-email">chibi.lab.chibi@gmail.com</a></p>
+      <a href="https://docs.google.com/forms/d/e/1FAIpQLSfsTu5M_ln2tvkn-N3_2mbyWaHF6K3KrXiTiSE6LW2xmBJP7Q/viewform" class="btn btn-primary contact-btn" id="contact-form-link" target="_blank" rel="noopener">お問い合わせフォーム</a>
 
       <div class="sns-row">
-        <a href="https://twitter.com/chibi_lab" aria-label="X（Twitter）" target="_blank" rel="noopener">X</a>
-        <a href="https://www.instagram.com/chibi_lab/" aria-label="Instagram" target="_blank" rel="noopener">Instagram</a>
-        <a href="https://www.youtube.com/channel/UCPiOUgdJ0pQmk5F_H9Do_Ig" aria-label="YouTube" target="_blank" rel="noopener">YouTube</a>
+        <a href="https://twitter.com/chibi_lab" id="sns-x" aria-label="X（Twitter）" target="_blank" rel="noopener">X</a>
+        <a href="https://www.instagram.com/chibi_lab/" id="sns-instagram" aria-label="Instagram" target="_blank" rel="noopener">Instagram</a>
+        <a href="https://www.youtube.com/channel/UCPiOUgdJ0pQmk5F_H9Do_Ig" id="sns-youtube" aria-label="YouTube" target="_blank" rel="noopener">YouTube</a>
       </div>
     </div>
   </section>

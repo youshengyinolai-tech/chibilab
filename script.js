@@ -1,7 +1,35 @@
 /* ============================================================
-   ここから下、EVENTS と GALLERY の中身を書き換えるだけで
-   サイトの表示が更新されます。HTML/CSSは触らなくてOKです。
+   ここから下、SITE / TOPICS / EVENTS / GALLERY の中身を書き換える
+   だけでサイトの表示が更新されます。HTML/CSSは触らなくてOKです。
    ============================================================ */
+
+// ---- サイト全体の文言（ヒーロー・ABOUT・お問い合わせ） ----
+const SITE = {
+  heroOrg: "東京理科大学 サイエンスコミュニケーションサークル",
+  heroKana: "（ちびラボ）",
+  heroTagline: "むずかしそうを、おもしろそうに。",
+  heroLead: "実験や工作、サイエンスショーを通じて、子どもたちに「科学っておもしろい」を届ける学生サークルです。",
+  aboutBody1: "chibi lab. は、2012年10月に東京理科大学の学生10名で発足したサイエンスコミュニケーションサークルです。科学館や図書館、地域のお祭りなどに出展し、実験ショーや工作教室を通じて子どもたちと科学のふれあいをつくっています。",
+  aboutBody2: "そんなモットーのもと、大学で学んだ知識を分かりやすく・楽しく届ける方法を、部員同士で日々研究しています。所属大学・学年を問わず、部員は随時募集中です。",
+  aboutPoint1: "科学館・図書館でのサイエンスショー出展",
+  aboutPoint2: "工作イベント・ワークショップの企画運営",
+  aboutPoint3: "YouTube・SNSでの科学コンテンツ発信",
+  contactBody: "実験教室・サイエンスショーのご依頼は、日時・場所・対象学年・人数などを明記のうえメールでご連絡ください（希望日の1〜2ヶ月前を目安にお願いします）。取材やその他のお問い合わせは、下記フォームからどうぞ。",
+  contactEmail: "chibi.lab.chibi@gmail.com",
+  contactFormUrl: "https://docs.google.com/forms/d/e/1FAIpQLSfsTu5M_ln2tvkn-N3_2mbyWaHF6K3KrXiTiSE6LW2xmBJP7Q/viewform",
+  snsX: "https://twitter.com/chibi_lab",
+  snsInstagram: "https://www.instagram.com/chibi_lab/",
+  snsYoutube: "https://www.youtube.com/channel/UCPiOUgdJ0pQmk5F_H9Do_Ig",
+};
+
+// ---- お知らせ（新しいものを配列の先頭に追加してください） ----
+const TOPICS = [
+  {
+    date: "2026.08.13",
+    title: "公式サイトをリニューアルしました",
+    body: "FC2ホームページからこの新しいサイトに移行しました。今後のお知らせはこちらに掲載していきます。",
+  },
+];
 
 // ---- イベント情報（新しいものを配列の先頭に追加してください） ----
 const EVENTS = [
@@ -70,6 +98,41 @@ const GALLERY = [
    ここから下は表示のしくみです。通常は触らなくて大丈夫です。
    ============================================================ */
 
+function renderSite() {
+  document.getElementById("hero-org").textContent = SITE.heroOrg;
+  document.getElementById("hero-kana").textContent = SITE.heroKana;
+  document.getElementById("hero-tagline").textContent = SITE.heroTagline;
+  document.getElementById("hero-lead").textContent = SITE.heroLead;
+  document.getElementById("about-body-1").textContent = SITE.aboutBody1;
+  document.getElementById("about-body-2").textContent = SITE.aboutBody2;
+  document.getElementById("about-point-1").textContent = SITE.aboutPoint1;
+  document.getElementById("about-point-2").textContent = SITE.aboutPoint2;
+  document.getElementById("about-point-3").textContent = SITE.aboutPoint3;
+  document.getElementById("contact-body").textContent = SITE.contactBody;
+
+  const email = document.getElementById("contact-email");
+  email.textContent = SITE.contactEmail;
+  email.href = "mailto:" + SITE.contactEmail;
+
+  document.getElementById("contact-form-link").href = SITE.contactFormUrl;
+  document.getElementById("sns-x").href = SITE.snsX;
+  document.getElementById("sns-instagram").href = SITE.snsInstagram;
+  document.getElementById("sns-youtube").href = SITE.snsYoutube;
+}
+
+function renderTopics() {
+  const list = document.getElementById("topics-list");
+  list.innerHTML = TOPICS.map(t => `
+    <article class="event-entry">
+      <div class="event-date">${t.date}</div>
+      <div class="event-body">
+        <h3>${t.title}</h3>
+        <p>${t.body}</p>
+      </div>
+    </article>
+  `).join("");
+}
+
 function renderEvents() {
   const list = document.getElementById("events-list");
   list.innerHTML = EVENTS.map(ev => `
@@ -119,6 +182,8 @@ function initNavToggle() {
 
 document.getElementById("year").textContent = new Date().getFullYear();
 
+renderSite();
+renderTopics();
 renderEvents();
 renderGallery();
 initNavToggle();
