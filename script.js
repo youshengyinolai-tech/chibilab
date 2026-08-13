@@ -22,7 +22,7 @@ const SITE = {
   "snsYoutube": "https://www.youtube.com/channel/UCPiOUgdJ0pQmk5F_H9Do_Ig"
 };
 
-// ---- お知らせ（新しいものを配列の先頭に追加してください） ----
+// ---- お知らせ（新しいものを配列の先頭に追加してください。image は省略可） ----
 const TOPICS = [
   {
     "date": "2026.08.13",
@@ -218,6 +218,7 @@ function renderTopics() {
       <div class="event-body">
         <h3>${t.title}</h3>
         <p>${t.body}</p>
+        ${t.image ? `<img class="topic-image" src="${t.image}" alt="${t.title}">` : ""}
       </div>
     </article>
   `).join("");

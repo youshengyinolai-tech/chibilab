@@ -15,6 +15,9 @@
   ------------------------------------------------------------
   ・サイトの文言（ヒーロー・ABOUT・お問い合わせ）、お知らせ、イベント情報、
     ギャラリーを、コードを見ずに書き換えられる「編集フォーム」です。
+  ・お知らせは「＋ お知らせを追加」で自由に何件でも追加でき、画像を付ける
+    こともできます。
+  ・「プレビュー」ボタンで、保存する前に実際の見た目をその場で確認できます。
   ・保存ボタンを押すと、GitHub上の script.js を直接書き換えて
     本番サイトに反映します（1〜2分で公開サイトに反映されます）。
   ・このページ自体は index.html / style.css / script.js と同じ
@@ -150,6 +153,39 @@ input:focus, textarea:focus {
   align-items: center;
 }
 
+.preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(29, 20, 10, 0.6);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.preview-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: #fff;
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+}
+
+.preview-bar .btn {
+  padding: 8px 18px;
+  background: var(--paper);
+}
+
+.preview-frame {
+  flex: 1;
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  background: #fff;
+}
+
 .btn {
   padding: 12px 22px;
   border-radius: 999px;
@@ -283,9 +319,19 @@ details summary {
   </div>
 
   <div class="save-bar" id="saveBar" style="display:none;">
+    <button class="btn" id="previewBtn">プレビュー</button>
     <button class="btn btn-primary" id="saveBtn">保存してサイトに反映</button>
     <span class="status" id="saveStatus"></span>
   </div>
+</div>
+
+<!-- プレビュー -->
+<div class="preview-overlay" id="previewOverlay" style="display:none;">
+  <div class="preview-bar">
+    <span>プレビュー（まだ保存されていません。実際の見た目の確認用です）</span>
+    <button class="btn" id="closePreviewBtn">閉じる</button>
+  </div>
+  <iframe id="previewFrame" class="preview-frame" title="プレビュー"></iframe>
 </div>
 
 <script>
@@ -314,6 +360,8 @@ el("addTopicBtn").addEventListener("click", () => { state.topics.unshift(blankTo
 el("addEventBtn").addEventListener("click", () => { state.events.unshift(blankEvent()); renderEvents(); });
 el("addPhotoBtn").addEventListener("click", () => { state.gallery.push(blankPhoto()); renderGallery(); });
 el("saveBtn").addEventListener("click", saveToGitHub);
+el("previewBtn").addEventListener("click", showPreview);
+el("closePreviewBtn").addEventListener("click", closePreview);
 
 SITE_FIELDS.forEach(key => {
   el("site-" + key).addEventListener("input", e => {
@@ -322,7 +370,7 @@ SITE_FIELDS.forEach(key => {
 });
 
 function blankTopic() {
-  return { date: "", title: "", body: "" };
+  return { date: "", title: "", body: "", image: "" };
 }
 function blankEvent() {
   return { date: "", title: "", place: "", body: "" };
@@ -417,6 +465,8 @@ function renderTopics() {
       <input type="text" data-tp="${i}" data-field="title" value="${escapeAttr(t.title)}" placeholder="お知らせのタイトル">
       <label>本文</label>
       <textarea data-tp="${i}" data-field="body" placeholder="お知らせの内容">${escapeHtml(t.body)}</textarea>
+      <label>画像ファイル名（任意。images/フォルダに入れたファイル名）</label>
+      <input type="text" data-tp="${i}" data-field="image" value="${escapeAttr(t.image)}" placeholder="images/topic01.jpg">
     </div>
   `).join("");
 
@@ -497,6 +547,47 @@ function renderGallery() {
 function escapeHtml(s) { return (s || "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
 function escapeAttr(s) { return (s || "").replace(/"/g, "&quot;"); }
 
+// state.site/topics/events/gallery の今の内容を反映した script.js 全文を組み立てる
+// （保存とプレビューの両方から使う）
+function buildUpdatedScriptContent() {
+  const newSiteBlock = "const SITE = " + JSON.stringify(state.site, null, 2) + ";";
+  const newTopicsBlock = "const TOPICS = " + JSON.stringify(state.topics, null, 2) + ";";
+  const newEventsBlock = "const EVENTS = " + JSON.stringify(state.events, null, 2) + ";";
+  const newGalleryBlock = "const GALLERY = " + JSON.stringify(state.gallery, null, 2) + ";";
+
+  return state.rawContent
+    .replace(/const SITE = \{[\s\S]*?\};/, newSiteBlock)
+    .replace(/const TOPICS = \[[\s\S]*?\];/, newTopicsBlock)
+    .replace(/const EVENTS = \[[\s\S]*?\];/, newEventsBlock)
+    .replace(/const GALLERY = \[[\s\S]*?\];/, newGalleryBlock);
+}
+
+// 保存前に、今の編集内容が実際のサイトでどう見えるかをiframeで表示する
+async function showPreview() {
+  const status = el("saveStatus");
+  try {
+    const res = await fetch("index.html");
+    if (!res.ok) throw new Error("index.htmlの取得に失敗しました");
+    const html = await res.text();
+    const newScript = buildUpdatedScriptContent().replace(/<\/script>/g, "<\\/script>");
+    const previewHtml = html.replace(
+      /<script src="script\.js"><\/script>/,
+      "<script>" + newScript + "<\/script>"
+    );
+
+    el("previewFrame").srcdoc = previewHtml;
+    el("previewOverlay").style.display = "flex";
+  } catch (e) {
+    status.textContent = "プレビュー表示エラー: " + e.message;
+    status.className = "status err";
+  }
+}
+
+function closePreview() {
+  el("previewOverlay").style.display = "none";
+  el("previewFrame").srcdoc = "";
+}
+
 async function saveToGitHub() {
   const status = el("saveStatus");
   el("saveBtn").disabled = true;
@@ -504,17 +595,7 @@ async function saveToGitHub() {
   status.className = "status busy";
 
   try {
-    const newSiteBlock = "const SITE = " + JSON.stringify(state.site, null, 2) + ";";
-    const newTopicsBlock = "const TOPICS = " + JSON.stringify(state.topics, null, 2) + ";";
-    const newEventsBlock = "const EVENTS = " + JSON.stringify(state.events, null, 2) + ";";
-    const newGalleryBlock = "const GALLERY = " + JSON.stringify(state.gallery, null, 2) + ";";
-
-    let newContent = state.rawContent
-      .replace(/const SITE = \{[\s\S]*?\};/, newSiteBlock)
-      .replace(/const TOPICS = \[[\s\S]*?\];/, newTopicsBlock)
-      .replace(/const EVENTS = \[[\s\S]*?\];/, newEventsBlock)
-      .replace(/const GALLERY = \[[\s\S]*?\];/, newGalleryBlock);
-
+    const newContent = buildUpdatedScriptContent();
     const b64 = btoa(unescape(encodeURIComponent(newContent)));
 
     const res = await fetch(`https://api.github.com/repos/${state.repo}/contents/script.js`, {
