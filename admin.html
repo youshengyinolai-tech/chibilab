@@ -208,6 +208,27 @@ input:focus, textarea:focus {
 }
 .btn-primary { background: var(--ink); color: var(--paper); }
 .btn-primary:disabled { opacity: 0.5; cursor: default; }
+.btn:disabled { opacity: 0.45; cursor: default; }
+
+.drag-handle {
+  cursor: grab;
+  display: inline-block;
+  padding: 2px 6px;
+  margin-right: 6px;
+  border-radius: 4px;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  user-select: none;
+  vertical-align: middle;
+}
+.drag-handle:hover { background: var(--border); color: var(--ink); }
+.drag-handle:active { cursor: grabbing; }
+
+.event-card, .gallery-card, .section-card { cursor: default; }
+.event-card.drag-over, .gallery-card.drag-over, .section-card.drag-over {
+  outline: 2px dashed var(--teal);
+  outline-offset: 3px;
+}
 
 .status {
   font-size: 0.85rem;
@@ -343,6 +364,8 @@ details summary {
   </div>
 
   <div class="save-bar" id="saveBar" style="display:none;">
+    <button class="btn" id="undoBtn" disabled>↶ 元に戻す</button>
+    <button class="btn" id="restoreBtn">読み込み時点に復元</button>
     <button class="btn" id="previewBtn">プレビュー</button>
     <button class="btn btn-primary" id="saveBtn">保存してサイトに反映</button>
     <span class="status" id="saveStatus"></span>
@@ -380,19 +403,153 @@ const state = { repo: "", token: "", sha: "", site: {}, topics: [], events: [], 
 const el = id => document.getElementById(id);
 
 el("connectBtn").addEventListener("click", loadFromGitHub);
-el("addTopicBtn").addEventListener("click", () => { state.topics.unshift(blankTopic()); renderTopics(); });
-el("addEventBtn").addEventListener("click", () => { state.events.unshift(blankEvent()); renderEvents(); });
-el("addPhotoBtn").addEventListener("click", () => { state.gallery.push(blankPhoto()); renderGallery(); });
-el("addSectionBtn").addEventListener("click", () => { state.sections.push(blankSection()); renderSections(); });
+el("addTopicBtn").addEventListener("click", () => { pushHistory(); state.topics.unshift(blankTopic()); renderTopics(); });
+el("addEventBtn").addEventListener("click", () => { pushHistory(); state.events.unshift(blankEvent()); renderEvents(); });
+el("addPhotoBtn").addEventListener("click", () => { pushHistory(); state.gallery.push(blankPhoto()); renderGallery(); });
+el("addSectionBtn").addEventListener("click", () => { pushHistory(); state.sections.push(blankSection()); renderSections(); });
 el("saveBtn").addEventListener("click", saveToGitHub);
 el("previewBtn").addEventListener("click", showPreview);
 el("closePreviewBtn").addEventListener("click", closePreview);
+el("undoBtn").addEventListener("click", undo);
+el("restoreBtn").addEventListener("click", restoreOriginal);
+
+/* ============================================================
+   元に戻す／読み込み時点に復元の仕組み
+   ------------------------------------------------------------
+   ・pushHistory() を操作の直前に呼ぶと、その時点の状態が履歴に積まれる
+   ・「元に戻す」は履歴を1つ戻す。押した回数ぶん、何段階でも戻れる
+   ・「読み込み時点に復元」は、GitHubから読み込んだ直後の状態に一気に戻す
+   ============================================================ */
+
+let historyStack = [];
+let originalSnapshot = null;
+const MAX_HISTORY = 50;
+
+function snapshotState() {
+  return JSON.stringify({
+    site: state.site,
+    topics: state.topics,
+    events: state.events,
+    gallery: state.gallery,
+    sections: state.sections,
+  });
+}
+
+function pushHistory() {
+  historyStack.push(snapshotState());
+  if (historyStack.length > MAX_HISTORY) historyStack.shift();
+  updateHistoryButtons();
+}
+
+// テキスト入力は1文字ごとに履歴を積まない。編集が始まった瞬間（＝直前の
+// 状態）だけを記録し、同じ欄を続けて入力している間は積み直さない。
+let textEditEl = null;
+let textEditTimer = null;
+function pushHistoryForTextEdit(e) {
+  if (textEditEl !== e.target || !textEditTimer) {
+    pushHistory();
+  }
+  textEditEl = e.target;
+  clearTimeout(textEditTimer);
+  textEditTimer = setTimeout(() => { textEditTimer = null; textEditEl = null; }, 1000);
+}
+
+function undo() {
+  if (!historyStack.length) return;
+  const snap = JSON.parse(historyStack.pop());
+  Object.assign(state, snap);
+  renderAll();
+  updateHistoryButtons();
+}
+
+function restoreOriginal() {
+  if (!originalSnapshot) return;
+  if (!confirm("読み込んだ時点の状態に戻します。保存していない変更は失われますがよろしいですか？")) return;
+  const snap = JSON.parse(originalSnapshot);
+  Object.assign(state, snap);
+  historyStack = [];
+  renderAll();
+  updateHistoryButtons();
+}
+
+function updateHistoryButtons() {
+  el("undoBtn").disabled = historyStack.length === 0;
+}
+
+function renderAll() {
+  renderSite();
+  renderTopics();
+  renderEvents();
+  renderGallery();
+  renderSections();
+}
+
+// カード一覧のドラッグ並び替え・削除・入力を、毎回の再描画で再登録しなくて
+// 済むよう、リストの外枠（container）にイベント委任でまとめて設定する
+function setupListEditor(container, getArray, rerender) {
+  container.addEventListener("input", e => {
+    const idx = e.target.dataset.idx;
+    if (idx === undefined) return;
+    pushHistoryForTextEdit(e);
+    getArray()[idx][e.target.dataset.field] = e.target.value;
+  });
+
+  container.addEventListener("click", e => {
+    const removeIdx = e.target.dataset.remove;
+    if (removeIdx === undefined) return;
+    pushHistory();
+    getArray().splice(removeIdx, 1);
+    rerender();
+  });
+
+  let dragSrc = null;
+
+  container.addEventListener("dragstart", e => {
+    if (!e.target.classList.contains("drag-handle")) return;
+    const card = e.target.closest("[data-idx]");
+    if (!card) return;
+    dragSrc = Number(card.dataset.idx);
+    e.dataTransfer.effectAllowed = "move";
+  });
+
+  container.addEventListener("dragenter", e => {
+    const card = e.target.closest("[data-idx]");
+    if (card) card.classList.add("drag-over");
+  });
+  container.addEventListener("dragleave", e => {
+    const card = e.target.closest("[data-idx]");
+    if (card) card.classList.remove("drag-over");
+  });
+  container.addEventListener("dragover", e => e.preventDefault());
+
+  container.addEventListener("drop", e => {
+    e.preventDefault();
+    container.querySelectorAll(".drag-over").forEach(c => c.classList.remove("drag-over"));
+    const card = e.target.closest("[data-idx]");
+    if (!card || dragSrc === null) return;
+    const dropIdx = Number(card.dataset.idx);
+    if (dropIdx !== dragSrc) {
+      pushHistory();
+      const arr = getArray();
+      const [item] = arr.splice(dragSrc, 1);
+      arr.splice(dropIdx, 0, item);
+      rerender();
+    }
+    dragSrc = null;
+  });
+}
 
 SITE_FIELDS.forEach(key => {
   el("site-" + key).addEventListener("input", e => {
+    pushHistoryForTextEdit(e);
     state.site[key] = e.target.value;
   });
 });
+
+setupListEditor(el("topicsList"), () => state.topics, renderTopics);
+setupListEditor(el("eventsList"), () => state.events, renderEvents);
+setupListEditor(el("galleryList"), () => state.gallery, renderGallery);
+setupSectionsEditor();
 
 function blankTopic() {
   return { date: "", title: "", body: "", image: "" };
@@ -445,11 +602,11 @@ async function loadFromGitHub() {
     state.sections = extractArray(content, "SECTIONS");
     state.rawContent = content;
 
-    renderSite();
-    renderTopics();
-    renderEvents();
-    renderGallery();
-    renderSections();
+    historyStack = [];
+    originalSnapshot = snapshotState();
+    updateHistoryButtons();
+
+    renderAll();
     el("sitePanel").style.display = "block";
     el("topicsPanel").style.display = "block";
     el("eventsPanel").style.display = "block";
@@ -491,96 +648,61 @@ function renderSite() {
 
 function renderTopics() {
   el("topicsList").innerHTML = state.topics.map((t, i) => `
-    <div class="event-card">
-      <button class="remove-btn" data-remove-topic="${i}">削除</button>
+    <div class="event-card" data-idx="${i}">
+      <span class="drag-handle" draggable="true" title="ドラッグで並び替え">⠿⠿</span>
+      <button class="remove-btn" data-remove="${i}">削除</button>
       <label>日付</label>
-      <input type="text" data-tp="${i}" data-field="date" value="${escapeAttr(t.date)}" placeholder="2026.08.13">
+      <input type="text" data-idx="${i}" data-field="date" value="${escapeAttr(t.date)}" placeholder="2026.08.13">
       <label>タイトル</label>
-      <input type="text" data-tp="${i}" data-field="title" value="${escapeAttr(t.title)}" placeholder="お知らせのタイトル">
+      <input type="text" data-idx="${i}" data-field="title" value="${escapeAttr(t.title)}" placeholder="お知らせのタイトル">
       <label>本文</label>
-      <textarea data-tp="${i}" data-field="body" placeholder="お知らせの内容">${escapeHtml(t.body)}</textarea>
+      <textarea data-idx="${i}" data-field="body" placeholder="お知らせの内容">${escapeHtml(t.body)}</textarea>
       <label>画像ファイル名（任意。images/フォルダに入れたファイル名）</label>
-      <input type="text" data-tp="${i}" data-field="image" value="${escapeAttr(t.image)}" placeholder="images/topic01.jpg">
+      <input type="text" data-idx="${i}" data-field="image" value="${escapeAttr(t.image)}" placeholder="images/topic01.jpg">
     </div>
   `).join("");
-
-  el("topicsList").querySelectorAll("input,textarea").forEach(input => {
-    input.addEventListener("input", e => {
-      const i = e.target.dataset.tp;
-      state.topics[i][e.target.dataset.field] = e.target.value;
-    });
-  });
-  el("topicsList").querySelectorAll("[data-remove-topic]").forEach(btn => {
-    btn.addEventListener("click", e => {
-      state.topics.splice(e.target.dataset.removeTopic, 1);
-      renderTopics();
-    });
-  });
 }
 
 function renderEvents() {
   el("eventsList").innerHTML = state.events.map((ev, i) => `
-    <div class="event-card">
-      <button class="remove-btn" data-remove-event="${i}">削除</button>
+    <div class="event-card" data-idx="${i}">
+      <span class="drag-handle" draggable="true" title="ドラッグで並び替え">⠿⠿</span>
+      <button class="remove-btn" data-remove="${i}">削除</button>
       <div class="row2">
         <div>
           <label>日付</label>
-          <input type="text" data-ev="${i}" data-field="date" value="${escapeAttr(ev.date)}" placeholder="2026.11.03">
+          <input type="text" data-idx="${i}" data-field="date" value="${escapeAttr(ev.date)}" placeholder="2026.11.03">
         </div>
         <div>
           <label>場所</label>
-          <input type="text" data-ev="${i}" data-field="place" value="${escapeAttr(ev.place)}" placeholder="としま産業振興プラザ">
+          <input type="text" data-idx="${i}" data-field="place" value="${escapeAttr(ev.place)}" placeholder="としま産業振興プラザ">
         </div>
       </div>
       <label>タイトル</label>
-      <input type="text" data-ev="${i}" data-field="title" value="${escapeAttr(ev.title)}" placeholder="イベント名">
+      <input type="text" data-idx="${i}" data-field="title" value="${escapeAttr(ev.title)}" placeholder="イベント名">
       <label>説明文</label>
-      <textarea data-ev="${i}" data-field="body" placeholder="どんな内容だったか、簡単に">${escapeHtml(ev.body)}</textarea>
+      <textarea data-idx="${i}" data-field="body" placeholder="どんな内容だったか、簡単に">${escapeHtml(ev.body)}</textarea>
     </div>
   `).join("");
-
-  el("eventsList").querySelectorAll("input,textarea").forEach(input => {
-    input.addEventListener("input", e => {
-      const i = e.target.dataset.ev;
-      state.events[i][e.target.dataset.field] = e.target.value;
-    });
-  });
-  el("eventsList").querySelectorAll("[data-remove-event]").forEach(btn => {
-    btn.addEventListener("click", e => {
-      state.events.splice(e.target.dataset.removeEvent, 1);
-      renderEvents();
-    });
-  });
 }
 
 function renderGallery() {
   el("galleryList").innerHTML = state.gallery.map((g, i) => `
-    <div class="gallery-card">
-      <button class="remove-btn" data-remove-photo="${i}">削除</button>
+    <div class="gallery-card" data-idx="${i}">
+      <span class="drag-handle" draggable="true" title="ドラッグで並び替え">⠿⠿</span>
+      <button class="remove-btn" data-remove="${i}">削除</button>
       <label>キャプション</label>
-      <input type="text" data-ph="${i}" data-field="caption" value="${escapeAttr(g.caption)}" placeholder="サイエンスショーの様子">
+      <input type="text" data-idx="${i}" data-field="caption" value="${escapeAttr(g.caption)}" placeholder="サイエンスショーの様子">
       <label>画像ファイル名（images/フォルダに入れたファイル名。空欄なら色プレースホルダー）</label>
-      <input type="text" data-ph="${i}" data-field="image" value="${escapeAttr(g.image)}" placeholder="images/event01.jpg">
+      <input type="text" data-idx="${i}" data-field="image" value="${escapeAttr(g.image)}" placeholder="images/event01.jpg">
     </div>
   `).join("");
-
-  el("galleryList").querySelectorAll("input").forEach(input => {
-    input.addEventListener("input", e => {
-      const i = e.target.dataset.ph;
-      state.gallery[i][e.target.dataset.field] = e.target.value;
-    });
-  });
-  el("galleryList").querySelectorAll("[data-remove-photo]").forEach(btn => {
-    btn.addEventListener("click", e => {
-      state.gallery.splice(e.target.dataset.removePhoto, 1);
-      renderGallery();
-    });
-  });
 }
 
 function renderSections() {
   el("sectionsList").innerHTML = state.sections.map((s, si) => `
-    <div class="section-card">
+    <div class="section-card" data-section-idx="${si}">
+      <span class="drag-handle section-drag-handle" draggable="true" title="ドラッグでセクションを並び替え">⠿⠿</span>
       <button class="remove-btn" data-remove-section="${si}">セクションごと削除</button>
       <label>ナビゲーションの表示名（英字推奨。例: CRAFT）</label>
       <input type="text" data-sec="${si}" data-field="navLabel" value="${escapeAttr(s.navLabel)}" placeholder="CRAFT">
@@ -592,7 +714,8 @@ function renderSections() {
       <label style="margin-top:16px;">このセクションの項目</label>
       <div class="items-editor">
         ${s.items.map((it, ii) => `
-          <div class="event-card">
+          <div class="event-card" data-item-idx="${ii}" data-section-idx-for-item="${si}">
+            <span class="drag-handle item-drag-handle" draggable="true" title="ドラッグで項目を並び替え">⠿⠿</span>
             <button class="remove-btn" data-remove-item="${si}:${ii}">削除</button>
             <label>タイトル</label>
             <input type="text" data-it="${si}:${ii}" data-field="title" value="${escapeAttr(it.title)}" placeholder="項目タイトル">
@@ -608,38 +731,99 @@ function renderSections() {
       <button class="add-btn" data-add-item="${si}">＋ 項目を追加</button>
     </div>
   `).join("");
+}
 
-  el("sectionsList").querySelectorAll("[data-sec]").forEach(input => {
-    input.addEventListener("input", e => {
-      const si = e.target.dataset.sec;
-      state.sections[si][e.target.dataset.field] = e.target.value;
-    });
-  });
-  el("sectionsList").querySelectorAll("[data-it]").forEach(input => {
-    input.addEventListener("input", e => {
+function setupSectionsEditor() {
+  const container = el("sectionsList");
+
+  container.addEventListener("input", e => {
+    if (e.target.dataset.sec !== undefined) {
+      pushHistoryForTextEdit(e);
+      state.sections[e.target.dataset.sec][e.target.dataset.field] = e.target.value;
+    } else if (e.target.dataset.it !== undefined) {
+      pushHistoryForTextEdit(e);
       const [si, ii] = e.target.dataset.it.split(":");
       state.sections[si].items[ii][e.target.dataset.field] = e.target.value;
-    });
+    }
   });
-  el("sectionsList").querySelectorAll("[data-remove-section]").forEach(btn => {
-    btn.addEventListener("click", e => {
+
+  container.addEventListener("click", e => {
+    if (e.target.dataset.removeSection !== undefined) {
+      pushHistory();
       state.sections.splice(e.target.dataset.removeSection, 1);
       renderSections();
-    });
-  });
-  el("sectionsList").querySelectorAll("[data-remove-item]").forEach(btn => {
-    btn.addEventListener("click", e => {
+    } else if (e.target.dataset.removeItem !== undefined) {
+      pushHistory();
       const [si, ii] = e.target.dataset.removeItem.split(":");
       state.sections[si].items.splice(ii, 1);
       renderSections();
-    });
-  });
-  el("sectionsList").querySelectorAll("[data-add-item]").forEach(btn => {
-    btn.addEventListener("click", e => {
-      const si = e.target.dataset.addItem;
-      state.sections[si].items.push(blankSectionItem());
+    } else if (e.target.dataset.addItem !== undefined) {
+      pushHistory();
+      state.sections[e.target.dataset.addItem].items.push(blankSectionItem());
       renderSections();
-    });
+    }
+  });
+
+  let dragSrcSection = null;
+  let dragSrcItem = null;
+
+  container.addEventListener("dragstart", e => {
+    if (e.target.classList.contains("section-drag-handle")) {
+      const card = e.target.closest("[data-section-idx]");
+      if (!card) return;
+      dragSrcSection = Number(card.dataset.sectionIdx);
+      dragSrcItem = null;
+    } else if (e.target.classList.contains("item-drag-handle")) {
+      const card = e.target.closest("[data-item-idx]");
+      if (!card) return;
+      dragSrcItem = { si: Number(card.dataset.sectionIdxForItem), ii: Number(card.dataset.itemIdx) };
+      dragSrcSection = null;
+    }
+    e.dataTransfer.effectAllowed = "move";
+  });
+
+  container.addEventListener("dragenter", e => {
+    const itemCard = e.target.closest("[data-item-idx]");
+    const sectionCard = e.target.closest("[data-section-idx]");
+    if (itemCard) itemCard.classList.add("drag-over");
+    else if (sectionCard) sectionCard.classList.add("drag-over");
+  });
+  container.addEventListener("dragleave", e => {
+    const card = e.target.closest("[data-item-idx], [data-section-idx]");
+    if (card) card.classList.remove("drag-over");
+  });
+  container.addEventListener("dragover", e => e.preventDefault());
+
+  container.addEventListener("drop", e => {
+    e.preventDefault();
+    container.querySelectorAll(".drag-over").forEach(c => c.classList.remove("drag-over"));
+
+    if (dragSrcItem !== null) {
+      const card = e.target.closest("[data-item-idx]");
+      dragSrcSection = null;
+      if (!card) { dragSrcItem = null; return; }
+      const targetSi = Number(card.dataset.sectionIdxForItem);
+      const targetIi = Number(card.dataset.itemIdx);
+      if (targetSi === dragSrcItem.si && targetIi !== dragSrcItem.ii) {
+        pushHistory();
+        const items = state.sections[targetSi].items;
+        const [item] = items.splice(dragSrcItem.ii, 1);
+        items.splice(targetIi, 0, item);
+        renderSections();
+      }
+      dragSrcItem = null;
+    } else if (dragSrcSection !== null) {
+      const card = e.target.closest("[data-section-idx]");
+      if (!card) { dragSrcSection = null; return; }
+      const dropIdx = Number(card.dataset.sectionIdx);
+      if (dropIdx !== dragSrcSection) {
+        pushHistory();
+        const [item] = state.sections.splice(dragSrcSection, 1);
+        state.sections.splice(dropIdx, 0, item);
+        renderSections();
+      }
+      dragSrcSection = null;
+    }
   });
 }
 
