@@ -210,7 +210,7 @@ a { color: inherit; }
 }
 
 .hero-logo {
-  width: min(320px, 70vw);
+  width: min(420px, 85vw);
   height: auto;
   animation: float 4s ease-in-out infinite;
 }
@@ -293,16 +293,16 @@ a { color: inherit; }
 
 .mascot-speech-bubble {
   position: relative;
+  width: clamp(200px, 26vw, 260px);
   background: #fff;
   border: 1.5px solid var(--ink);
   border-radius: 14px;
-  padding: 8px 12px;
+  padding: 10px 14px;
   margin: 0 0 18px;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.72rem;
-  line-height: 1.5;
-  white-space: nowrap;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.75rem;
+  line-height: 1.55;
   box-shadow: 3px 3px 0 rgba(74,42,18,0.12);
 }
 
