@@ -184,6 +184,10 @@ const GALLERY = [
   }
 ];
 
+// ---- 追加セクション（GALLERYとCONTACTの間に自由に増やせます） ----
+// 各セクションの items は { title, body, image, link } のカード一覧です（image/linkは省略可）
+const SECTIONS = [];
+
 /* ============================================================
    ここから下は表示のしくみです。通常は触らなくて大丈夫です。
    ============================================================ */
@@ -252,6 +256,54 @@ function renderGallery() {
   `).join("");
 }
 
+function renderSections() {
+  const container = document.getElementById("custom-sections");
+  const contactLink = document.querySelector('.site-nav a[href="#contact"]');
+  const contactTag = document.getElementById("contact-tag");
+  if (!container) return;
+
+  // 前回分のナビリンクが残っていたら消してから作り直す
+  document.querySelectorAll(".site-nav [data-custom-nav]").forEach(a => a.remove());
+
+  const tagClasses = ["tag-teal", "tag-amber", "tag-magenta"];
+
+  SECTIONS.forEach((s, i) => {
+    if (contactLink) {
+      contactLink.insertAdjacentHTML(
+        "beforebegin",
+        `<a href="#${s.id}" data-custom-nav>${s.navLabel}</a>`
+      );
+    }
+  });
+
+  container.innerHTML = SECTIONS.map((s, i) => {
+    const num = String(5 + i).padStart(2, "0");
+    return `
+      <section id="${s.id}" class="section ${i % 2 === 0 ? "section-alt" : ""}">
+        <div class="section-head">
+          <span class="tag ${tagClasses[i % tagClasses.length]}">${num} / ${s.navLabel}</span>
+          <h2>${s.title}</h2>
+        </div>
+        ${s.intro ? `<p class="section-note">${s.intro}</p>` : ""}
+        <div class="items-grid">
+          ${s.items.map(it => `
+            <div class="item-card">
+              ${it.image ? `<img src="${it.image}" alt="${it.title}">` : ""}
+              <h3>${it.title}</h3>
+              <p>${it.body}</p>
+              ${it.link ? `<a class="item-link" href="${it.link}" target="_blank" rel="noopener">詳しくはこちら →</a>` : ""}
+            </div>
+          `).join("")}
+        </div>
+      </section>
+    `;
+  }).join("");
+
+  if (contactTag) {
+    contactTag.textContent = String(5 + SECTIONS.length).padStart(2, "0") + " / CONTACT";
+  }
+}
+
 // モバイルメニュー開閉
 function initNavToggle() {
   const toggle = document.querySelector(".nav-toggle");
@@ -277,4 +329,5 @@ renderSite();
 renderTopics();
 renderEvents();
 renderGallery();
+renderSections();
 initNavToggle();

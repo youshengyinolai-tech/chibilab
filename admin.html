@@ -112,6 +112,18 @@ input:focus, textarea:focus {
   background: var(--paper-alt);
 }
 
+.section-card {
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  position: relative;
+  background: #fff;
+}
+
+.items-editor { margin-top: 8px; }
+.items-editor .event-card { background: var(--paper); }
+
 .remove-btn {
   position: absolute;
   top: 10px;
@@ -318,6 +330,18 @@ details summary {
     <button class="add-btn" id="addPhotoBtn">＋ 写真を追加</button>
   </div>
 
+  <!-- 追加セクション編集 -->
+  <div class="panel" id="sectionsPanel" style="display:none;">
+    <h2><span class="badge" style="background:var(--amber);color:var(--ink);">STEP 6</span> 新しいセクション</h2>
+    <p class="setup-note">
+      ABOUTやEVENTSと同じように、独立した新しいセクションを自由に追加できます
+      （工作紹介、リンク集、クイズなど）。GALLERYとお問い合わせの間に表示され、
+      上のナビゲーションにも自動で追加されます。
+    </p>
+    <div id="sectionsList"></div>
+    <button class="add-btn" id="addSectionBtn">＋ セクションを追加</button>
+  </div>
+
   <div class="save-bar" id="saveBar" style="display:none;">
     <button class="btn" id="previewBtn">プレビュー</button>
     <button class="btn btn-primary" id="saveBtn">保存してサイトに反映</button>
@@ -351,7 +375,7 @@ const SITE_FIELDS = [
   "snsX", "snsInstagram", "snsYoutube",
 ];
 
-const state = { repo: "", token: "", sha: "", site: {}, topics: [], events: [], gallery: [] };
+const state = { repo: "", token: "", sha: "", site: {}, topics: [], events: [], gallery: [], sections: [] };
 
 const el = id => document.getElementById(id);
 
@@ -359,6 +383,7 @@ el("connectBtn").addEventListener("click", loadFromGitHub);
 el("addTopicBtn").addEventListener("click", () => { state.topics.unshift(blankTopic()); renderTopics(); });
 el("addEventBtn").addEventListener("click", () => { state.events.unshift(blankEvent()); renderEvents(); });
 el("addPhotoBtn").addEventListener("click", () => { state.gallery.push(blankPhoto()); renderGallery(); });
+el("addSectionBtn").addEventListener("click", () => { state.sections.push(blankSection()); renderSections(); });
 el("saveBtn").addEventListener("click", saveToGitHub);
 el("previewBtn").addEventListener("click", showPreview);
 el("closePreviewBtn").addEventListener("click", closePreview);
@@ -377,6 +402,12 @@ function blankEvent() {
 }
 function blankPhoto() {
   return { image: "", color: "#AB511F", caption: "", tilt: 0 };
+}
+function blankSection() {
+  return { navLabel: "", title: "", intro: "", items: [] };
+}
+function blankSectionItem() {
+  return { title: "", body: "", image: "", link: "" };
 }
 
 async function loadFromGitHub() {
@@ -411,16 +442,19 @@ async function loadFromGitHub() {
     state.topics = extractArray(content, "TOPICS");
     state.events = extractArray(content, "EVENTS");
     state.gallery = extractArray(content, "GALLERY");
+    state.sections = extractArray(content, "SECTIONS");
     state.rawContent = content;
 
     renderSite();
     renderTopics();
     renderEvents();
     renderGallery();
+    renderSections();
     el("sitePanel").style.display = "block";
     el("topicsPanel").style.display = "block";
     el("eventsPanel").style.display = "block";
     el("galleryPanel").style.display = "block";
+    el("sectionsPanel").style.display = "block";
     el("saveBar").style.display = "flex";
 
     status.textContent = "読み込み完了 ✓";
@@ -544,22 +578,100 @@ function renderGallery() {
   });
 }
 
+function renderSections() {
+  el("sectionsList").innerHTML = state.sections.map((s, si) => `
+    <div class="section-card">
+      <button class="remove-btn" data-remove-section="${si}">セクションごと削除</button>
+      <label>ナビゲーションの表示名（英字推奨。例: CRAFT）</label>
+      <input type="text" data-sec="${si}" data-field="navLabel" value="${escapeAttr(s.navLabel)}" placeholder="CRAFT">
+      <label>見出し</label>
+      <input type="text" data-sec="${si}" data-field="title" value="${escapeAttr(s.title)}" placeholder="工作紹介">
+      <label>説明文（任意）</label>
+      <textarea data-sec="${si}" data-field="intro" placeholder="このセクションの紹介文">${escapeHtml(s.intro)}</textarea>
+
+      <label style="margin-top:16px;">このセクションの項目</label>
+      <div class="items-editor">
+        ${s.items.map((it, ii) => `
+          <div class="event-card">
+            <button class="remove-btn" data-remove-item="${si}:${ii}">削除</button>
+            <label>タイトル</label>
+            <input type="text" data-it="${si}:${ii}" data-field="title" value="${escapeAttr(it.title)}" placeholder="項目タイトル">
+            <label>説明</label>
+            <textarea data-it="${si}:${ii}" data-field="body" placeholder="説明文">${escapeHtml(it.body)}</textarea>
+            <label>画像ファイル名（任意）</label>
+            <input type="text" data-it="${si}:${ii}" data-field="image" value="${escapeAttr(it.image)}" placeholder="images/xxx.jpg">
+            <label>リンクURL（任意）</label>
+            <input type="text" data-it="${si}:${ii}" data-field="link" value="${escapeAttr(it.link)}" placeholder="https://...">
+          </div>
+        `).join("")}
+      </div>
+      <button class="add-btn" data-add-item="${si}">＋ 項目を追加</button>
+    </div>
+  `).join("");
+
+  el("sectionsList").querySelectorAll("[data-sec]").forEach(input => {
+    input.addEventListener("input", e => {
+      const si = e.target.dataset.sec;
+      state.sections[si][e.target.dataset.field] = e.target.value;
+    });
+  });
+  el("sectionsList").querySelectorAll("[data-it]").forEach(input => {
+    input.addEventListener("input", e => {
+      const [si, ii] = e.target.dataset.it.split(":");
+      state.sections[si].items[ii][e.target.dataset.field] = e.target.value;
+    });
+  });
+  el("sectionsList").querySelectorAll("[data-remove-section]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      state.sections.splice(e.target.dataset.removeSection, 1);
+      renderSections();
+    });
+  });
+  el("sectionsList").querySelectorAll("[data-remove-item]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      const [si, ii] = e.target.dataset.removeItem.split(":");
+      state.sections[si].items.splice(ii, 1);
+      renderSections();
+    });
+  });
+  el("sectionsList").querySelectorAll("[data-add-item]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      const si = e.target.dataset.addItem;
+      state.sections[si].items.push(blankSectionItem());
+      renderSections();
+    });
+  });
+}
+
+// ナビ表示名からURL用のIDを作る（例: "工作紹介" → "section-1"、"Craft Ideas" → "craft-ideas"）
+function slugify(str, fallback) {
+  const s = (str || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return s || fallback;
+}
+
 function escapeHtml(s) { return (s || "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
 function escapeAttr(s) { return (s || "").replace(/"/g, "&quot;"); }
 
 // state.site/topics/events/gallery の今の内容を反映した script.js 全文を組み立てる
 // （保存とプレビューの両方から使う）
 function buildUpdatedScriptContent() {
+  const sectionsWithIds = state.sections.map((s, i) => ({
+    ...s,
+    id: slugify(s.navLabel, "section-" + (i + 1)),
+  }));
+
   const newSiteBlock = "const SITE = " + JSON.stringify(state.site, null, 2) + ";";
   const newTopicsBlock = "const TOPICS = " + JSON.stringify(state.topics, null, 2) + ";";
   const newEventsBlock = "const EVENTS = " + JSON.stringify(state.events, null, 2) + ";";
   const newGalleryBlock = "const GALLERY = " + JSON.stringify(state.gallery, null, 2) + ";";
+  const newSectionsBlock = "const SECTIONS = " + JSON.stringify(sectionsWithIds, null, 2) + ";";
 
   return state.rawContent
     .replace(/const SITE = \{[\s\S]*?\};/, newSiteBlock)
     .replace(/const TOPICS = \[[\s\S]*?\];/, newTopicsBlock)
     .replace(/const EVENTS = \[[\s\S]*?\];/, newEventsBlock)
-    .replace(/const GALLERY = \[[\s\S]*?\];/, newGalleryBlock);
+    .replace(/const GALLERY = \[[\s\S]*?\];/, newGalleryBlock)
+    .replace(/const SECTIONS = \[[\s\S]*?\];/, newSectionsBlock);
 }
 
 // 保存前に、今の編集内容が実際のサイトでどう見えるかをiframeで表示する

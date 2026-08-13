@@ -20,6 +20,8 @@
     写真キャプション、お問い合わせ文言など「よく更新する文章」は
     script.js の一番上に SITE / TOPICS / EVENTS / GALLERY としてまとめてあります。
     HTMLをいじらなくても script.js の中身を書き換えるだけで反映されます。
+  ・GALLERYとCONTACTの間には、SECTIONS を使って自由に新しいセクション
+    （工作紹介・リンク集など）を追加できます（#custom-sections に自動挿入）。
   ・くわしい更新手順は README.md を見てください。
   ============================================
 -->
@@ -139,10 +141,13 @@
     </div>
   </section>
 
+  <!-- 追加セクション（script.js の SECTIONS で自由に増やせます） -->
+  <div id="custom-sections"></div>
+
   <!-- CONTACT -->
   <section id="contact" class="section section-alt">
     <div class="section-head">
-      <span class="tag tag-teal">05 / CONTACT</span>
+      <span class="tag tag-teal" id="contact-tag">05 / CONTACT</span>
       <h2>お問い合わせ</h2>
     </div>
 
