@@ -37,7 +37,7 @@ images/brand/… ロゴ・マスコット「ラボくま君」の画像（差し
 ### 方法A：admin.html を使う（おすすめ・コード不要）
 
 1. `admin.html` をブラウザで開く（公開後は `https://<ユーザー名>.github.io/<リポジトリ名>/admin.html`）
-2. 「STEP 1」でリポジトリ名（例: `youshengyinolai-tech/chibilab-site`）と
+2. 「STEP 1」でリポジトリ名（`youshengyinolai-tech/chibilab`）と
    GitHubのアクセストークンを入力し「読み込む」を押す
    - トークンの作り方は下の「GitHubトークンの発行方法」を参照
 3. 表示されたフォームで内容を編集する
@@ -89,7 +89,7 @@ images/brand/… ロゴ・マスコット「ラボくま君」の画像（差し
 
 ## GitHub Pagesでの公開設定
 
-1. このフォルダの中身をGitHubリポジトリ（例: `chibilab-site`）にpushする
+1. このフォルダの中身をGitHubリポジトリ（`youshengyinolai-tech/chibilab`）にpushする
 2. リポジトリの **Settings → Pages** を開く
 3. **Source** を「Deploy from a branch」、**Branch** を `main` / `/(root)` に設定
 4. 数分後、`https://<ユーザー名>.github.io/<リポジトリ名>/` で公開される
