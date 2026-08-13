@@ -172,8 +172,22 @@ a { color: inherit; }
   color: var(--ink);
 }
 
+.hero-kana {
+  font-size: 0.42em;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.hero-tagline {
+  margin: 14px 0 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.15rem, 2.4vw, 1.5rem);
+  color: var(--teal-dark);
+}
+
 .hero-lead {
-  margin: 22px 0 32px;
+  margin: 14px 0 32px;
   color: var(--ink-soft);
   font-size: 1.05rem;
   max-width: 46ch;
@@ -216,7 +230,7 @@ a { color: inherit; }
 }
 
 .hero-logo {
-  width: min(560px, 60vw);
+  width: min(680px, 66vw);
   height: auto;
   animation: float 4s ease-in-out infinite;
 }
