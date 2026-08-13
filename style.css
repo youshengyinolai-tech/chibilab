@@ -210,7 +210,7 @@ a { color: inherit; }
 }
 
 .hero-logo {
-  width: min(420px, 85vw);
+  width: min(520px, 88vw);
   height: auto;
   animation: float 4s ease-in-out infinite;
 }
@@ -280,48 +280,20 @@ a { color: inherit; }
   box-shadow: 6px 6px 0 rgba(74,42,18,0.08);
 }
 
-.mascot-speech {
+.sticky-note {
   position: absolute;
-  top: -54px;
+  top: -18px;
   right: clamp(16px, 4vw, 40px);
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-}
-
-.mascot-speech img { width: 64px; height: auto; flex-shrink: 0; }
-
-.mascot-speech-bubble {
-  position: relative;
-  width: clamp(200px, 26vw, 260px);
-  background: #fff;
-  border: 1.5px solid var(--ink);
-  border-radius: 14px;
+  background: var(--amber);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-align: center;
   padding: 10px 14px;
-  margin: 0 0 18px;
-  font-family: var(--font-body);
-  font-weight: 500;
-  font-size: 0.75rem;
-  line-height: 1.55;
-  box-shadow: 3px 3px 0 rgba(74,42,18,0.12);
-}
-
-.mascot-speech-bubble::before,
-.mascot-speech-bubble::after {
-  content: "";
-  position: absolute;
-  bottom: -7px;
-  right: 22px;
-  width: 0;
-  height: 0;
-  border-style: solid;
-  border-width: 9px 6px 0 0;
-}
-.mascot-speech-bubble::before { border-color: var(--ink) transparent transparent transparent; right: 21px; bottom: -8.5px; }
-.mascot-speech-bubble::after { border-color: #fff transparent transparent transparent; }
-
-@media (max-width: 640px) {
-  .mascot-speech { position: static; margin-bottom: 16px; }
+  border-radius: 4px;
+  transform: rotate(4deg);
+  box-shadow: 3px 3px 0 rgba(74,42,18,0.15);
 }
 
 .about-card p { color: var(--ink-soft); max-width: 62ch; }
