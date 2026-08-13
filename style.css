@@ -159,7 +159,7 @@ a { color: inherit; }
 }
 
 .hero h1 {
-  font-size: clamp(2.4rem, 5.5vw, 3.6rem);
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
   font-weight: 900;
   color: var(--ink);
 }
@@ -232,7 +232,7 @@ a { color: inherit; }
 }
 
 .hero-logo {
-  width: min(500px, 52vw);
+  width: min(380px, 40vw);
   height: auto;
   animation: float 4s ease-in-out infinite;
 }
