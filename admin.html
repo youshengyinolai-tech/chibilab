@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
-<meta name="theme-color" content="#FDFBF3">
+<meta name="theme-color" content="#FFFBEA">
 <meta name="darkreader-lock" content="">
 <title>chibi lab. 編集ページ（管理用・非公開推奨）</title>
 <meta name="robots" content="noindex, nofollow">
@@ -25,15 +25,15 @@
 
 <style>
 :root {
-  --paper: #FDFBF3;
-  --paper-alt: #F7F2E4;
-  --ink: #1D2B33;
-  --ink-soft: #4B5A61;
-  --teal: #2A9D8F;
-  --teal-dark: #1F776C;
-  --amber: #F4A340;
-  --magenta: #E85D75;
-  --border: #DDD5C0;
+  --paper: #FFFBEA;
+  --paper-alt: #FFF6C4;
+  --ink: #4A2A12;
+  --ink-soft: #8A6A4A;
+  --teal: #AB511F;
+  --teal-dark: #7F3F00;
+  --amber: #D7862E;
+  --magenta: #FF0080;
+  --border: #E8D9A8;
   --radius: 12px;
 }
 * { box-sizing: border-box; }
@@ -56,7 +56,7 @@ h1 { font-size: 1.4rem; margin: 0 0 4px; }
   border-radius: var(--radius);
   padding: 20px;
   margin-bottom: 22px;
-  box-shadow: 4px 4px 0 rgba(29,43,51,0.06);
+  box-shadow: 4px 4px 0 rgba(74,42,18,0.06);
 }
 
 .panel h2 {
@@ -260,7 +260,7 @@ function blankEvent() {
   return { date: "", title: "", place: "", body: "" };
 }
 function blankPhoto() {
-  return { image: "", color: "#2A9D8F", caption: "", tilt: 0 };
+  return { image: "", color: "#AB511F", caption: "", tilt: 0 };
 }
 
 async function loadFromGitHub() {

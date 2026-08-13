@@ -6,17 +6,17 @@
    ============================================================ */
 
 :root {
-  /* カラー：実験ノート × 薬品カラー */
-  --paper:      #FDFBF3;
-  --paper-alt:  #F7F2E4;
-  --ink:        #1D2B33;
-  --ink-soft:   #4B5A61;
-  --grid-line:  #DFE6DE;
+  /* カラー：ロゴ＆ラボくま君から抽出したブランドカラー */
+  --paper:      #FFFBEA;
+  --paper-alt:  #FFF6C4;
+  --ink:        #4A2A12;
+  --ink-soft:   #8A6A4A;
+  --grid-line:  #F0E2B0;
 
-  --teal:       #2A9D8F;
-  --teal-dark:  #1F776C;
-  --amber:      #F4A340;
-  --magenta:    #E85D75;
+  --teal:       #AB511F;
+  --teal-dark:  #7F3F00;
+  --amber:      #D7862E;
+  --magenta:    #FF0080;
 
   --font-display: "Zen Maru Gothic", sans-serif;
   --font-body:    "Noto Sans JP", sans-serif;
@@ -30,13 +30,13 @@
 
 html {
   scroll-behavior: smooth;
-  background-color: #FDFBF3 !important;
+  background-color: #FFFBEA !important;
   color-scheme: light only;
 }
 
 body {
-  background-color: #FDFBF3 !important;
-  color: #1D2B33 !important;
+  background-color: #FFFBEA !important;
+  color: #4A2A12 !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -98,7 +98,7 @@ a { color: inherit; }
   font-size: 1.3rem;
 }
 
-.logo-flask { width: 30px; height: 30px; color: var(--ink); }
+.logo-badge { width: 34px; height: 34px; object-fit: contain; }
 
 .site-nav {
   display: flex;
@@ -209,24 +209,15 @@ a { color: inherit; }
   gap: 10px;
 }
 
-.beaker { width: min(240px, 60vw); height: auto; }
-
-.beaker-liquid {
-  fill: var(--teal);
-  transition: y 0.05s linear, height 0.05s linear;
+.mascot-hero {
+  width: min(280px, 65vw);
+  height: auto;
+  animation: float 4s ease-in-out infinite;
 }
 
-.bubble {
-  fill: rgba(255,255,255,0.65);
-  animation: rise 3.2s ease-in infinite;
-}
-.b2 { animation-delay: 0.9s; }
-.b3 { animation-delay: 1.8s; }
-
-@keyframes rise {
-  0%   { transform: translateY(0); opacity: 0; }
-  15%  { opacity: 1; }
-  100% { transform: translateY(-140px); opacity: 0; }
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
 }
 
 .beaker-caption {
@@ -293,7 +284,7 @@ a { color: inherit; }
   border: 1.5px solid var(--ink);
   border-radius: var(--radius);
   padding: clamp(24px, 4vw, 40px);
-  box-shadow: 6px 6px 0 rgba(29,43,51,0.08);
+  box-shadow: 6px 6px 0 rgba(74,42,18,0.08);
 }
 
 .sticky-note {
@@ -309,7 +300,7 @@ a { color: inherit; }
   padding: 10px 14px;
   border-radius: 4px;
   transform: rotate(4deg);
-  box-shadow: 3px 3px 0 rgba(29,43,51,0.15);
+  box-shadow: 3px 3px 0 rgba(74,42,18,0.15);
 }
 
 .about-card p { color: var(--ink-soft); max-width: 62ch; }
@@ -402,7 +393,7 @@ a { color: inherit; }
   font-weight: 700;
   font-size: 0.8rem;
   color: var(--ink);
-  border: 1.5px dashed rgba(29,43,51,0.35);
+  border: 1.5px dashed rgba(74,42,18,0.35);
   margin-bottom: 10px;
 }
 
@@ -415,6 +406,18 @@ a { color: inherit; }
 /* ============ コンタクト ============ */
 .contact-card p { color: var(--ink-soft); max-width: 56ch; }
 .contact-btn { margin-top: 18px; }
+
+.contact-mascot {
+  position: absolute;
+  top: -34px;
+  right: clamp(16px, 4vw, 40px);
+  width: 88px;
+  height: auto;
+  filter: drop-shadow(3px 3px 0 rgba(74,42,18,0.15));
+}
+@media (max-width: 560px) {
+  .contact-mascot { display: none; }
+}
 
 .sns-row {
   display: flex;
