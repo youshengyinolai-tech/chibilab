@@ -110,6 +110,7 @@ input:focus, textarea:focus {
   margin-bottom: 12px;
   position: relative;
   background: var(--paper-alt);
+  touch-action: none;
 }
 
 .section-card {
@@ -119,6 +120,13 @@ input:focus, textarea:focus {
   margin-bottom: 16px;
   position: relative;
   background: #fff;
+  touch-action: none;
+}
+
+.event-card input, .event-card textarea,
+.gallery-card input,
+.section-card > input, .section-card > textarea {
+  touch-action: auto;
 }
 
 .items-editor { margin-top: 8px; }
@@ -224,6 +232,13 @@ input:focus, textarea:focus {
 }
 .drag-handle:hover { background: var(--border); color: var(--ink); }
 .drag-handle:active { cursor: grabbing; }
+
+.card-dragging {
+  opacity: 0.92;
+  box-shadow: 0 8px 18px rgba(74,42,18,0.28);
+  position: relative;
+  z-index: 2;
+}
 
 .status {
   font-size: 0.85rem;
@@ -485,14 +500,22 @@ function renderAll() {
    HTML5標準のドラッグ&ドロップAPIはスマホ・タブレットのタッチ操作では
    動かないブラウザが多いため、マウスもタッチも同じ仕組みで扱える
    Pointer Events（pointerdown/pointermove/pointerup）で自作している。
+   カードの入力欄・ボタン・リンク以外なら、どこを掴んでもドラッグを
+   始められる（excludeSelectorを指定すると、その中は別の並び替え対象
+   ―セクション内の項目など―に譲る）。
    ドラッグ中、指やカーソルが別のカードの上を通過するたびに、その場で
    配列を入れ替えて再描画する（Trelloのカード並び替えと同じ方式）。
+   移動が起きた瞬間は、直前の位置からふわっとスライドするアニメーションを
+   つけている（FLIP法：再描画の前後で位置の差分を測り、逆向きに一瞬ずらして
+   から本来の位置へtransitionさせる）。
    ============================================================ */
-function makeSortable(container, handleSelector, cardSelector, getLocation, rerender) {
+const NON_DRAGGABLE_SELECTOR = "input, textarea, select, button, a";
+
+function makeSortable(container, cardSelector, getLocation, rerender, excludeSelector) {
   container.addEventListener("pointerdown", e => {
-    const handle = e.target.closest(handleSelector);
-    if (!handle) return;
-    const card = handle.closest(cardSelector);
+    if (e.target.closest(NON_DRAGGABLE_SELECTOR)) return;
+    if (excludeSelector && e.target.closest(excludeSelector)) return;
+    const card = e.target.closest(cardSelector);
     if (!card || !container.contains(card)) return;
 
     e.preventDefault();
@@ -501,6 +524,8 @@ function makeSortable(container, handleSelector, cardSelector, getLocation, rere
     const startLoc = getLocation(card);
     const draggedItem = startLoc.list[startLoc.index];
     let moved = false;
+
+    card.classList.add("card-dragging");
 
     function onMove(ev) {
       const elAtPoint = document.elementFromPoint(ev.clientX, ev.clientY);
@@ -516,15 +541,21 @@ function makeSortable(container, handleSelector, cardSelector, getLocation, rere
       if (curIndex === -1) return;
       if (overLoc.index === curIndex) return;
 
+      const finishAnimation = prepareSlideAnimation(container, cardSelector, curIndex, overLoc.index);
       curList.splice(curIndex, 1);
       curList.splice(overLoc.index, 0, draggedItem);
       moved = true;
       rerender();
+      finishAnimation();
+
+      const newCards = container.querySelectorAll(cardSelector);
+      if (newCards[overLoc.index]) newCards[overLoc.index].classList.add("card-dragging");
     }
 
     function onUp() {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      container.querySelectorAll(".card-dragging").forEach(c => c.classList.remove("card-dragging"));
       if (!moved) {
         // 何も動かなかった場合は、直前に積んだ履歴を取り消しておく
         historyStack.pop();
@@ -535,6 +566,42 @@ function makeSortable(container, handleSelector, cardSelector, getLocation, rere
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   });
+}
+
+// 入れ替え前の各カードの位置を記録しておき、再描画後にそのカードが
+// 実際どれだけ動いたかを計算して、逆方向にずらした状態から元の位置へ
+// スッと戻すことで「動いた」ことが視覚的にわかるようにする
+function prepareSlideAnimation(container, cardSelector, fromIndex, toIndex) {
+  const oldRects = Array.from(container.querySelectorAll(cardSelector)).map(c => c.getBoundingClientRect());
+
+  return () => {
+    const newCards = Array.from(container.querySelectorAll(cardSelector));
+    newCards.forEach((card, newIndex) => {
+      let oldIndex;
+      if (newIndex === toIndex) {
+        oldIndex = fromIndex;
+      } else if (fromIndex < toIndex && newIndex >= fromIndex && newIndex < toIndex) {
+        oldIndex = newIndex + 1;
+      } else if (fromIndex > toIndex && newIndex > toIndex && newIndex <= fromIndex) {
+        oldIndex = newIndex - 1;
+      } else {
+        oldIndex = newIndex;
+      }
+
+      const oldRect = oldRects[oldIndex];
+      if (!oldRect) return;
+      const newRect = card.getBoundingClientRect();
+      const dy = oldRect.top - newRect.top;
+      if (Math.abs(dy) < 1) return;
+
+      card.style.transition = "none";
+      card.style.transform = `translateY(${dy}px)`;
+      requestAnimationFrame(() => {
+        card.style.transition = "transform 180ms ease";
+        card.style.transform = "";
+      });
+    });
+  };
 }
 
 // カード一覧の削除・入力を、毎回の再描画で再登録しなくて済むよう、
@@ -555,7 +622,7 @@ function setupListEditor(container, getArray, rerender) {
     rerender();
   });
 
-  makeSortable(container, ".drag-handle", "[data-idx]", card => ({
+  makeSortable(container, "[data-idx]", card => ({
     list: getArray(),
     index: Number(card.dataset.idx),
   }), rerender);
@@ -786,14 +853,15 @@ function setupSectionsEditor() {
     }
   });
 
-  // セクションそのものの並び替え
-  makeSortable(container, ".section-drag-handle", "[data-section-idx]", card => ({
+  // セクションそのものの並び替え（ただし、中の項目カードの上を掴んだ場合は
+  // 項目の並び替えに譲る＝下のmakeSortableに任せる）
+  makeSortable(container, "[data-section-idx]", card => ({
     list: state.sections,
     index: Number(card.dataset.sectionIdx),
-  }), renderSections);
+  }), renderSections, "[data-item-idx]");
 
   // セクション内の項目の並び替え（同じセクションの中でのみ動く）
-  makeSortable(container, ".item-drag-handle", "[data-item-idx]", card => {
+  makeSortable(container, "[data-item-idx]", card => {
     const si = Number(card.dataset.sectionIdxForItem);
     return { list: state.sections[si].items, index: Number(card.dataset.itemIdx) };
   }, renderSections);
