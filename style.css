@@ -158,18 +158,20 @@ a { color: inherit; }
   max-width: 620px;
 }
 
-.eyebrow {
-  font-family: var(--font-mono);
-  color: var(--teal-dark);
-  font-size: 0.85rem;
-  letter-spacing: 0.06em;
-  margin: 0 0 14px;
-}
-
 .hero h1 {
   font-size: clamp(2.4rem, 5.5vw, 3.6rem);
   font-weight: 900;
   color: var(--ink);
+}
+
+.hero-org {
+  display: block;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--teal-dark);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  margin: 0 0 14px;
 }
 
 .hero-kana {
@@ -223,14 +225,14 @@ a { color: inherit; }
 .hero-visual {
   position: absolute;
   top: 50%;
-  right: clamp(-40px, -2vw, 10px);
+  right: clamp(0px, 1vw, 24px);
   transform: translateY(-50%);
   z-index: 0;
   pointer-events: none;
 }
 
 .hero-logo {
-  width: min(680px, 66vw);
+  width: min(500px, 52vw);
   height: auto;
   animation: float 4s ease-in-out infinite;
 }
