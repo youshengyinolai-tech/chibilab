@@ -22,9 +22,61 @@ const ORDER_LABELS = {
 };
 const ALL_ORDER_KEYS = Object.keys(ORDER_LABELS);
 
-const state = { repo: "", token: "", sha: "", site: {}, topics: [], events: [], gallery: [], sections: [], sectionOrder: ["about", "topics", "events", "gallery"] };
+const state = { repo: "", token: "", sha: "", site: {}, topics: [], events: [], gallery: [], sections: [], sectionOrder: ["about", "topics", "events", "gallery"], nextSectionKey: 1 };
 
 const el = id => document.getElementById(id);
+
+// 追加セクション（STEP7）はナビ用のid（navLabelから作る。同名だと衝突しうる）
+// とは別に、削除・リネームしても揺らがない管理用の内部キー（"section:数字"）を
+// state.sectionOrder側の目印として使う。保存・プレビュー時にだけ本物のidへ
+// 変換する（サイト側が実際に参照できるのはそのidだけなので）。
+function sectionOrderKey(sec) { return "section:" + sec._key; }
+
+// script.jsから読み込んだSECTION_ORDER（固定ブロックのキーと、追加セクションの
+// 本物のid文字列が混ざったもの。もしくは今日までの旧バージョンが保存した
+// "custom"という1本のまとめキー）を、admin.js内部で使う"section:数字"形式の
+// キーに変換する。あわせて、SECTION_ORDERに一度も出てこない追加セクションが
+// あれば末尾に足しておく（保存時に何らかの理由で漏れていた場合の保険）。
+function migrateSectionOrder(rawOrder) {
+  const order = [];
+  rawOrder.forEach(key => {
+    if (key === "custom") {
+      // 旧バージョン（追加セクションをまとめて1本で扱っていた）からの移行：
+      // その位置に、まだ登場していない追加セクションを配列の順番で展開する
+      state.sections.forEach(s => {
+        const k = sectionOrderKey(s);
+        if (!order.includes(k)) order.push(k);
+      });
+      return;
+    }
+    const match = state.sections.find(s => s.id === key);
+    if (match) {
+      const k = sectionOrderKey(match);
+      if (!order.includes(k)) order.push(k);
+      return;
+    }
+    if (!order.includes(key)) order.push(key);
+  });
+  state.sections.forEach(s => {
+    const k = sectionOrderKey(s);
+    if (!order.includes(k)) order.push(k);
+  });
+  return order;
+}
+
+// 保存・プレビュー用に、"section:数字"キーを今の内容から計算した本物のid文字列
+// へ変換したSECTION_ORDERを作る（サイト側はこのidでしか要素を探せないため）
+function serializableSectionOrder() {
+  const ids = sectionsWithComputedIds();
+  return state.sectionOrder
+    .map(key => {
+      if (!key.startsWith("section:")) return key;
+      const secKey = Number(key.slice(8));
+      const idx = state.sections.findIndex(s => s._key === secKey);
+      return idx !== -1 ? ids[idx].id : null;
+    })
+    .filter(Boolean);
+}
 
 el("connectBtn").addEventListener("click", loadFromGitHub);
 el("addTopicBtn").addEventListener("click", () => { pushHistory(); state.topics.unshift(blankTopic()); renderTopics(); });
@@ -32,8 +84,10 @@ el("addEventBtn").addEventListener("click", () => { pushHistory(); state.events.
 el("addPhotoBtn").addEventListener("click", () => { pushHistory(); state.gallery.push(blankPhoto()); renderGallery(); });
 el("addSectionBtn").addEventListener("click", () => {
   pushHistory();
-  state.sections.push(blankSection());
-  if (!state.sectionOrder.includes("custom")) state.sectionOrder.push("custom");
+  const sec = blankSection();
+  sec._key = state.nextSectionKey++;
+  state.sections.push(sec);
+  state.sectionOrder.push(sectionOrderKey(sec));
   renderSections();
   renderOrder();
 });
@@ -118,16 +172,25 @@ function renderAll() {
 
 function renderOrder() {
   el("orderList").innerHTML = state.sectionOrder.map((key, i) => {
-    // 追加セクション（STEP7）がまだ1つもない間は、動かす対象がないので表示しない
-    if (key === "custom" && !state.sections.length) return "";
-    const label = key === "custom" ? "追加セクション（STEP7で作った項目）" : (ORDER_LABELS[key] || key);
-    // 追加セクションは「非表示」ではなくSTEP7側で個別に削除するので、ここには消すボタンを出さない
-    const hideBtn = key === "custom" ? "" : `<button class="remove-btn" data-hide-section="${key}" style="position:static; margin-left:auto; display:block;">非表示にする</button>`;
+    if (key.startsWith("section:")) {
+      const secKey = Number(key.slice(8));
+      const sec = state.sections.find(s => s._key === secKey);
+      if (!sec) return ""; // 削除済みなど、参照が古くなっている場合の保険
+      const label = sec.navLabel ? escapeHtml(sec.navLabel) : "（名称未設定の追加セクション）";
+      return `
+        <div class="event-card" data-idx="${i}">
+          <span class="drag-handle" title="ドラッグで並び替え">⠿⠿</span>
+          <strong>${label}</strong>
+          <button class="remove-btn" data-remove-order-section="${key}" style="position:static; margin-left:auto; display:block;">削除</button>
+        </div>
+      `;
+    }
+    const label = ORDER_LABELS[key] || key;
     return `
       <div class="event-card" data-idx="${i}">
         <span class="drag-handle" title="ドラッグで並び替え">⠿⠿</span>
         <strong>${label}</strong>
-        ${hideBtn}
+        <button class="remove-btn" data-hide-section="${key}" style="position:static; margin-left:auto; display:block;">非表示にする</button>
       </div>
     `;
   }).join("");
@@ -338,11 +401,24 @@ makeSortable(el("orderList"), "[data-idx]", card => ({
 }), renderOrder);
 
 el("orderList").addEventListener("click", e => {
-  const key = e.target.dataset.hideSection;
-  if (key === undefined) return;
-  pushHistory();
-  state.sectionOrder.splice(state.sectionOrder.indexOf(key), 1);
-  renderOrder();
+  if (e.target.dataset.hideSection !== undefined) {
+    const key = e.target.dataset.hideSection;
+    pushHistory();
+    state.sectionOrder.splice(state.sectionOrder.indexOf(key), 1);
+    renderOrder();
+    return;
+  }
+  if (e.target.dataset.removeOrderSection !== undefined) {
+    const key = e.target.dataset.removeOrderSection;
+    const secKey = Number(key.slice(8));
+    pushHistory();
+    const idx = state.sections.findIndex(s => s._key === secKey);
+    if (idx !== -1) state.sections.splice(idx, 1);
+    const orderIdx = state.sectionOrder.indexOf(key);
+    if (orderIdx !== -1) state.sectionOrder.splice(orderIdx, 1);
+    renderOrder();
+    renderSections();
+  }
 });
 
 function blankTopic() {
@@ -394,12 +470,12 @@ async function loadFromGitHub() {
     state.events = extractArray(content, "EVENTS");
     state.gallery = extractArray(content, "GALLERY");
     state.sections = extractArray(content, "SECTIONS");
-    state.sectionOrder = extractArray(content, "SECTION_ORDER");
-    if (!state.sectionOrder.length) state.sectionOrder = ["about", "topics", "events", "gallery"];
-    // 追加セクション（STEP7）の表示位置は"custom"というキーで管理する。
-    // 古いscript.js（このキーがまだ無いもの）を読み込んだ場合は、これまで通り
-    // 一番下に来るように末尾へ足しておく
-    if (!state.sectionOrder.includes("custom")) state.sectionOrder.push("custom");
+    state.sections.forEach((s, i) => { s._key = i + 1; });
+    state.nextSectionKey = state.sections.length + 1;
+
+    let rawOrder = extractArray(content, "SECTION_ORDER");
+    if (!rawOrder.length) rawOrder = ["about", "topics", "events", "gallery"];
+    state.sectionOrder = migrateSectionOrder(rawOrder);
     state.rawContent = content;
 
     historyStack = [];
@@ -503,7 +579,6 @@ function renderGallery() {
 function renderSections() {
   el("sectionsList").innerHTML = state.sections.map((s, si) => `
     <div class="section-card" data-section-idx="${si}">
-      <span class="drag-handle section-drag-handle" title="ドラッグでセクションを並び替え">⠿⠿</span>
       <button class="remove-btn" data-remove-section="${si}">セクションごと削除</button>
       <label>ナビゲーションの表示名（英字推奨。例: CRAFT）</label>
       <input type="text" data-sec="${si}" data-field="navLabel" value="${escapeAttr(s.navLabel)}" placeholder="CRAFT">
@@ -541,6 +616,9 @@ function setupSectionsEditor() {
     if (e.target.dataset.sec !== undefined) {
       pushHistoryForTextEdit(e);
       state.sections[e.target.dataset.sec][e.target.dataset.field] = e.target.value;
+      // STEP3のラベルはセクション名（navLabel）を表示しているので、
+      // 入力中もそこに反映されるようにする
+      if (e.target.dataset.field === "navLabel") renderOrder();
     } else if (e.target.dataset.it !== undefined) {
       pushHistoryForTextEdit(e);
       const [si, ii] = e.target.dataset.it.split(":");
@@ -551,7 +629,9 @@ function setupSectionsEditor() {
   container.addEventListener("click", e => {
     if (e.target.dataset.removeSection !== undefined) {
       pushHistory();
-      state.sections.splice(e.target.dataset.removeSection, 1);
+      const removed = state.sections.splice(e.target.dataset.removeSection, 1)[0];
+      const orderIdx = state.sectionOrder.indexOf(sectionOrderKey(removed));
+      if (orderIdx !== -1) state.sectionOrder.splice(orderIdx, 1);
       renderSections();
       renderOrder();
     } else if (e.target.dataset.removeItem !== undefined) {
@@ -566,12 +646,8 @@ function setupSectionsEditor() {
     }
   });
 
-  // セクションそのものの並び替え（ただし、中の項目カードの上を掴んだ場合は
-  // 項目の並び替えに譲る＝下のmakeSortableに任せる）
-  makeSortable(container, "[data-section-idx]", card => ({
-    list: state.sections,
-    index: Number(card.dataset.sectionIdx),
-  }), renderSections, "[data-item-idx]");
+  // セクションそのものをサイト上のどこに表示するかはSTEP3で決めるため、
+  // ここではセクション自体の並び替えはしない（項目の並び替えのみ）。
 
   // セクション内の項目の並び替え（同じセクションの中でのみ動く）
   makeSortable(container, "[data-item-idx]", card => {
@@ -592,17 +668,12 @@ function escapeAttr(s) { return (s || "").replace(/"/g, "&quot;"); }
 // state.site/topics/events/gallery の今の内容を反映した script.js 全文を組み立てる
 // （保存とプレビューの両方から使う）
 function buildUpdatedScriptContent() {
-  const sectionsWithIds = state.sections.map((s, i) => ({
-    ...s,
-    id: slugify(s.navLabel, "section-" + (i + 1)),
-  }));
-
   const newSiteBlock = "var SITE = " + JSON.stringify(state.site, null, 2) + ";";
   const newTopicsBlock = "var TOPICS = " + JSON.stringify(state.topics, null, 2) + ";";
   const newEventsBlock = "var EVENTS = " + JSON.stringify(state.events, null, 2) + ";";
   const newGalleryBlock = "var GALLERY = " + JSON.stringify(state.gallery, null, 2) + ";";
-  const newSectionsBlock = "var SECTIONS = " + JSON.stringify(sectionsWithIds, null, 2) + ";";
-  const newOrderBlock = "var SECTION_ORDER = " + JSON.stringify(state.sectionOrder, null, 2) + ";";
+  const newSectionsBlock = "var SECTIONS = " + JSON.stringify(sectionsWithComputedIds(), null, 2) + ";";
+  const newOrderBlock = "var SECTION_ORDER = " + JSON.stringify(serializableSectionOrder(), null, 2) + ";";
 
   return state.rawContent
     .replace(/(?:const|var|let) SITE = \{[\s\S]*?\};/, newSiteBlock)
@@ -615,10 +686,11 @@ function buildUpdatedScriptContent() {
 
 // 現在ドラフト中の内容(state)を反映したSECTIONS配列（id付き）を作る
 function sectionsWithComputedIds() {
-  return state.sections.map((s, i) => ({
-    ...s,
-    id: slugify(s.navLabel, "section-" + (i + 1)),
-  }));
+  return state.sections.map((s, i) => {
+    // _keyはadmin.js内部だけで使う管理用の値なので、サイト側に渡すデータには含めない
+    const { _key, ...rest } = s;
+    return { ...rest, id: slugify(s.navLabel, "section-" + (i + 1)) };
+  });
 }
 
 /* ============================================================
@@ -661,7 +733,7 @@ async function showPreview() {
     win.EVENTS = state.events;
     win.GALLERY = state.gallery;
     win.SECTIONS = sectionsWithComputedIds();
-    win.SECTION_ORDER = state.sectionOrder;
+    win.SECTION_ORDER = serializableSectionOrder();
 
     // サイト本体と全く同じ関数を、上書きしたデータで実行し直す
     // （renderSections()が追加セクションのDOM/タグ要素を作ってから、

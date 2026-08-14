@@ -262,16 +262,15 @@ function renderGallery() {
 
 // ABOUT・お知らせ・イベント情報・ギャラリーの4ブロックを、SECTION_ORDER の
 // 順番どおりに並べ替える（同じ要素を移動するだけなので、内容はそのまま）
-// ABOUT/TOPICS/EVENTS/GALLERYの固定ブロックと、STEP7で作った追加セクションを
-// まとめて1本の順番として並び替える。追加セクションは"custom"という特別な
-// キーで表し、SECTION_ORDER内のどこに置くかでABOUTなどより上にも下にも
-// 自由に移動できる（追加セクション同士の並びはSECTIONS配列の順番のまま）。
-// 古い（"custom"を含まない）SECTION_ORDERを読み込んだ場合は、これまで通り
-// 追加セクションが一番下に来るようにする。
+// ABOUT/TOPICS/EVENTS/GALLERYの固定ブロックと、STEP7で作った追加セクション
+// （SECTIONS配列の各要素）を、1本の順番としてまとめて並び替える。追加セクション
+// はSECTION_ORDER内でそれぞれ自分のid（例: "section-1"）として直接登場するので、
+// 固定ブロックの間に個別に割り込ませることもできる。SECTION_ORDERに登場しない
+// 追加セクションは、これまで通り一番下に足す（後方互換：追加セクションに一切
+// 触れていない古いSECTION_ORDERでも、これまで通り末尾に表示される）。
 function applySectionOrder() {
   const main = document.getElementById("top");
   const contactSection = document.getElementById("contact");
-  const customContainer = document.getElementById("custom-sections");
   if (!main || !contactSection) return;
 
   const labels = {
@@ -282,38 +281,55 @@ function applySectionOrder() {
   };
   const customTagClasses = ["tag-teal", "tag-amber", "tag-magenta"];
   const contactLink = document.querySelector('.site-nav a[href="#contact"]');
-  const order = SECTION_ORDER.includes("custom") ? SECTION_ORDER : [...SECTION_ORDER, "custom"];
+  const customById = {};
+  SECTIONS.forEach((s, i) => { customById[s.id] = { section: s, i }; });
 
   // SECTION_ORDERに載っていない固定ブロックは非表示にする（中身は消えない）
   Object.keys(labels).forEach(key => {
-    if (order.includes(key)) return;
+    if (SECTION_ORDER.includes(key)) return;
     const section = document.getElementById(key);
     const navLink = document.querySelector(`.site-nav a[href="#${key}"]`);
     if (section) section.style.display = "none";
     if (navLink) navLink.style.display = "none";
   });
 
+  // "custom"（旧バージョンが使っていたまとめキー）が残っていたら、その位置に
+  // まだ登場していない追加セクションを展開する
+  const order = [];
+  SECTION_ORDER.forEach(key => {
+    if (key === "custom") {
+      SECTIONS.forEach(s => { if (!order.includes(s.id)) order.push(s.id); });
+      return;
+    }
+    order.push(key);
+  });
+  // SECTION_ORDERに一度も出てこない追加セクションは末尾に足す
+  SECTIONS.forEach(s => { if (!order.includes(s.id)) order.push(s.id); });
+
   let num = 1;
   order.forEach(key => {
-    if (key === "custom") {
-      if (customContainer) main.insertBefore(customContainer, contactSection);
-      SECTIONS.forEach((s, i) => {
-        const navLink = document.querySelector(`.site-nav [data-custom-nav][href="#${s.id}"]`);
-        if (navLink && contactLink) contactLink.parentNode.insertBefore(navLink, contactLink);
-        const tag = document.getElementById(s.id + "-tag");
-        if (tag) {
-          tag.textContent = `${String(num).padStart(2, "0")} / ${s.navLabel}`;
-          tag.className = "tag " + customTagClasses[i % customTagClasses.length];
-        }
-        num++;
-      });
+    const custom = customById[key];
+    if (custom) {
+      const s = custom.section;
+      const section = document.getElementById(s.id);
+      const navLink = document.querySelector(`.site-nav [data-custom-nav][href="#${s.id}"]`);
+      const tag = document.getElementById(s.id + "-tag");
+      if (!section) return;
+
+      main.insertBefore(section, contactSection);
+      if (navLink && contactLink) contactLink.parentNode.insertBefore(navLink, contactLink);
+      if (tag) {
+        tag.textContent = `${String(num).padStart(2, "0")} / ${s.navLabel}`;
+        tag.className = "tag " + customTagClasses[custom.i % customTagClasses.length];
+      }
+      num++;
       return;
     }
 
     const section = document.getElementById(key);
     const tag = document.getElementById(key + "-tag");
     const navLink = document.querySelector(`.site-nav a[href="#${key}"]`);
-    if (!section) return;
+    if (!section || !labels[key]) return;
 
     section.style.display = "";
     if (navLink) navLink.style.display = "";
@@ -321,7 +337,7 @@ function applySectionOrder() {
     main.insertBefore(section, contactSection);
     if (navLink && contactLink) contactLink.parentNode.insertBefore(navLink, contactLink);
 
-    if (tag && labels[key]) {
+    if (tag) {
       tag.textContent = `${String(num).padStart(2, "0")} / ${labels[key].name}`;
       tag.className = "tag " + labels[key].tagClass;
     }
@@ -341,7 +357,10 @@ function renderSections() {
   const contactLink = document.querySelector('.site-nav a[href="#contact"]');
   if (!container) return;
 
-  // 前回分のナビリンクが残っていたら消してから作り直す
+  // 前回分の追加セクション本体・ナビリンクが残っていたら消してから作り直す。
+  // applySectionOrder()が各セクションをcustom-sectionsの外（mainの直下）へ
+  // 移動させるため、containerのinnerHTML書き換えだけでは消えない
+  document.querySelectorAll("[data-custom-section]").forEach(elm => elm.remove());
   document.querySelectorAll(".site-nav [data-custom-nav]").forEach(a => a.remove());
 
   SECTIONS.forEach(s => {
@@ -354,7 +373,7 @@ function renderSections() {
   });
 
   container.innerHTML = SECTIONS.map((s, i) => `
-    <section id="${s.id}" class="section ${i % 2 === 0 ? "section-alt" : ""}">
+    <section id="${s.id}" data-custom-section class="section ${i % 2 === 0 ? "section-alt" : ""}">
       <div class="section-head">
         <span class="tag" id="${s.id}-tag"></span>
         <h2>${s.title}</h2>
