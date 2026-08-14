@@ -939,8 +939,14 @@ function buildUpdatedScriptContent() {
 // 保存前に、今の編集内容が実際のサイトでどう見えるかをiframeで表示する
 async function showPreview() {
   const status = el("saveStatus");
+  const previewBtn = el("previewBtn");
+  previewBtn.disabled = true;
+  status.textContent = "プレビューを準備中…";
+  status.className = "status busy";
+
   try {
-    const res = await fetch("index.html");
+    // キャッシュされた古いindex.htmlを掴まないよう、必ずサーバーから取り直す
+    const res = await fetch("index.html", { cache: "no-store" });
     if (!res.ok) throw new Error("index.htmlの取得に失敗しました");
     const html = await res.text();
     const newScript = buildUpdatedScriptContent().replace(/<\/script>/g, "<\\/script>");
@@ -949,11 +955,24 @@ async function showPreview() {
       "<script>" + newScript + "<\/script>"
     );
 
-    el("previewFrame").srcdoc = previewHtml;
+    const frame = el("previewFrame");
     el("previewOverlay").style.display = "flex";
+
+    // iframeへのsrcdoc反映は非同期なので、実際に読み込み終わる(load)まで待ってから
+    // 「準備完了」とみなす。ここを待たないと、更新前の中身が一瞬見えることがある
+    await new Promise((resolve, reject) => {
+      frame.onload = resolve;
+      frame.onerror = () => reject(new Error("プレビューの読み込みに失敗しました"));
+      frame.srcdoc = previewHtml;
+    });
+
+    status.textContent = "";
+    status.className = "status";
   } catch (e) {
     status.textContent = "プレビュー表示エラー: " + e.message;
     status.className = "status err";
+  } finally {
+    previewBtn.disabled = false;
   }
 }
 
