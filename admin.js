@@ -602,7 +602,13 @@ async function showPreview() {
 
 function closePreview() {
   el("previewOverlay").style.display = "none";
-  el("previewFrame").srcdoc = "";
+  const frame = el("previewFrame");
+  // 以前はsrcdocでプレビューを表示していた名残でsrcdoc=""をここでセットしていたが、
+  // srcdoc属性が残っているとsrc側のページ遷移より優先されてしまい、次に
+  // プレビューを開いたときに空白ページのまま（renderSiteが見つからない）に
+  // なる原因だった。src方式に統一したので、閉じるときはsrc属性ごと空にする
+  frame.removeAttribute("srcdoc");
+  frame.src = "about:blank";
 }
 
 async function saveToGitHub() {
