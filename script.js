@@ -4,7 +4,7 @@
    ============================================================ */
 
 // ---- サイト全体の文言（ヒーロー・ABOUT・お問い合わせ） ----
-const SITE = {
+var SITE = {
   "heroOrg": "東京理科大学 サイエンスコミュニケーションサークル",
   "heroKana": "（ちびラボ）",
   "heroTagline": "むずかしそうを、おもしろそうに。",
@@ -23,7 +23,7 @@ const SITE = {
 };
 
 // ---- お知らせ（新しいものを配列の先頭に追加してください。image は省略可） ----
-const TOPICS = [
+var TOPICS = [
   {
     "date": "2026.08.13",
     "title": "公式サイトをリニューアルしました",
@@ -32,7 +32,7 @@ const TOPICS = [
 ];
 
 // ---- イベント情報（新しいものを配列の先頭に追加してください） ----
-const EVENTS = [
+var EVENTS = [
   {
     "date": "2024.03.02",
     "title": "入浴剤を作ってみよう!! 水の中でもシャボン玉ができる!?",
@@ -73,7 +73,7 @@ const EVENTS = [
 
 // ---- ギャラリー写真（本番では画像ファイルに差し替えてください） ----
 // image: 画像パス（例 "images/event01.jpg"）。空のままなら色付きプレースホルダーが表示されます。
-const GALLERY = [
+var GALLERY = [
   {
     "image": "images/chibilab-miraiken-2016-03-dryice.jpg",
     "color": "#AB511F",
@@ -186,11 +186,11 @@ const GALLERY = [
 
 // ---- 追加セクション（GALLERYとCONTACTの間に自由に増やせます） ----
 // 各セクションの items は { title, body, image, link } のカード一覧です（image/linkは省略可）
-const SECTIONS = [];
+var SECTIONS = [];
 
 // ---- ページの並び順（ABOUT・お知らせ・イベント情報・ギャラリーの表示順） ----
 // この4つの並び順を入れ替えたいときは、配列の中身の順番を書き換えてください
-const SECTION_ORDER = ["about", "topics", "events", "gallery"];
+var SECTION_ORDER = ["about", "topics", "events", "gallery"];
 
 /* ============================================================
    ここから下は表示のしくみです。通常は触らなくて大丈夫です。

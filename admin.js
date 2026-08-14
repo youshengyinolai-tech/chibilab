@@ -516,23 +516,41 @@ function buildUpdatedScriptContent() {
     id: slugify(s.navLabel, "section-" + (i + 1)),
   }));
 
-  const newSiteBlock = "const SITE = " + JSON.stringify(state.site, null, 2) + ";";
-  const newTopicsBlock = "const TOPICS = " + JSON.stringify(state.topics, null, 2) + ";";
-  const newEventsBlock = "const EVENTS = " + JSON.stringify(state.events, null, 2) + ";";
-  const newGalleryBlock = "const GALLERY = " + JSON.stringify(state.gallery, null, 2) + ";";
-  const newSectionsBlock = "const SECTIONS = " + JSON.stringify(sectionsWithIds, null, 2) + ";";
-  const newOrderBlock = "const SECTION_ORDER = " + JSON.stringify(state.sectionOrder, null, 2) + ";";
+  const newSiteBlock = "var SITE = " + JSON.stringify(state.site, null, 2) + ";";
+  const newTopicsBlock = "var TOPICS = " + JSON.stringify(state.topics, null, 2) + ";";
+  const newEventsBlock = "var EVENTS = " + JSON.stringify(state.events, null, 2) + ";";
+  const newGalleryBlock = "var GALLERY = " + JSON.stringify(state.gallery, null, 2) + ";";
+  const newSectionsBlock = "var SECTIONS = " + JSON.stringify(sectionsWithIds, null, 2) + ";";
+  const newOrderBlock = "var SECTION_ORDER = " + JSON.stringify(state.sectionOrder, null, 2) + ";";
 
   return state.rawContent
-    .replace(/const SITE = \{[\s\S]*?\};/, newSiteBlock)
-    .replace(/const TOPICS = \[[\s\S]*?\];/, newTopicsBlock)
-    .replace(/const EVENTS = \[[\s\S]*?\];/, newEventsBlock)
-    .replace(/const GALLERY = \[[\s\S]*?\];/, newGalleryBlock)
-    .replace(/const SECTIONS = \[[\s\S]*?\];/, newSectionsBlock)
-    .replace(/const SECTION_ORDER = \[[\s\S]*?\];/, newOrderBlock);
+    .replace(/var SITE = \{[\s\S]*?\};/, newSiteBlock)
+    .replace(/var TOPICS = \[[\s\S]*?\];/, newTopicsBlock)
+    .replace(/var EVENTS = \[[\s\S]*?\];/, newEventsBlock)
+    .replace(/var GALLERY = \[[\s\S]*?\];/, newGalleryBlock)
+    .replace(/var SECTIONS = \[[\s\S]*?\];/, newSectionsBlock)
+    .replace(/var SECTION_ORDER = \[[\s\S]*?\];/, newOrderBlock);
 }
 
-// 保存前に、今の編集内容が実際のサイトでどう見えるかをiframeで表示する
+// 現在ドラフト中の内容(state)を反映したSECTIONS配列（id付き）を作る
+function sectionsWithComputedIds() {
+  return state.sections.map((s, i) => ({
+    ...s,
+    id: slugify(s.navLabel, "section-" + (i + 1)),
+  }));
+}
+
+/* ============================================================
+   保存前に、今の編集内容が実際のサイトでどう見えるかをiframeで表示する
+   ------------------------------------------------------------
+   以前は「index.htmlを取得してscript.jsの中身を文字列置換で埋め込む」
+   方式だったが、キャッシュ・エスケープ処理の噛み合わせによっては
+   更新前の内容が表示され続けることがあった。
+   今は「実際にindex.htmlをキャッシュなしで本物のページとして読み込み、
+   読み込み後にサイト側と全く同じ変数(SITE/TOPICS/...)・関数
+   (renderSite()など)をその場で上書き・再実行する」方式にして、
+   文字列操作の余地をなくしている。
+   ============================================================ */
 async function showPreview() {
   const status = el("saveStatus");
   const previewBtn = el("previewBtn");
@@ -541,26 +559,36 @@ async function showPreview() {
   status.className = "status busy";
 
   try {
-    // キャッシュされた古いindex.htmlを掴まないよう、必ずサーバーから取り直す
-    const res = await fetch("index.html", { cache: "no-store" });
-    if (!res.ok) throw new Error("index.htmlの取得に失敗しました");
-    const html = await res.text();
-    const newScript = buildUpdatedScriptContent().replace(/<\/script>/g, "<\\/script>");
-    const previewHtml = html.replace(
-      /<script src="script\.js"><\/script>/,
-      "<script>" + newScript + "<\/script>"
-    );
-
     const frame = el("previewFrame");
     el("previewOverlay").style.display = "flex";
 
-    // iframeへのsrcdoc反映は非同期なので、実際に読み込み終わる(load)まで待ってから
-    // 「準備完了」とみなす。ここを待たないと、更新前の中身が一瞬見えることがある
+    // クエリ文字列を毎回変えることで、途中のキャッシュ層をすべて回避する
     await new Promise((resolve, reject) => {
       frame.onload = resolve;
       frame.onerror = () => reject(new Error("プレビューの読み込みに失敗しました"));
-      frame.srcdoc = previewHtml;
+      frame.src = "index.html?preview=" + Date.now();
     });
+
+    const win = frame.contentWindow;
+    if (!win || typeof win.renderSite !== "function") {
+      throw new Error("プレビューの内部処理が見つかりませんでした");
+    }
+
+    // サイト本体と同じグローバル変数を、今の編集内容で上書きする
+    win.SITE = state.site;
+    win.TOPICS = state.topics;
+    win.EVENTS = state.events;
+    win.GALLERY = state.gallery;
+    win.SECTIONS = sectionsWithComputedIds();
+    win.SECTION_ORDER = state.sectionOrder;
+
+    // サイト本体と全く同じ関数を、上書きしたデータで実行し直す
+    win.applySectionOrder();
+    win.renderSite();
+    win.renderTopics();
+    win.renderEvents();
+    win.renderGallery();
+    win.renderSections();
 
     status.textContent = "";
     status.className = "status";
