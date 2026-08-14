@@ -345,7 +345,7 @@ async function loadFromGitHub() {
 
 // script.js のテキストから TOPICS / EVENTS / GALLERY 配列を抜き出してJSオブジェクトに変換
 function extractArray(content, varName) {
-  const re = new RegExp(`const ${varName} = (\\[[\\s\\S]*?\\]);`);
+  const re = new RegExp(`(?:const|var|let) ${varName} = (\\[[\\s\\S]*?\\]);`);
   const match = content.match(re);
   if (!match) return [];
   // eslint-disable-next-line no-eval
@@ -354,7 +354,7 @@ function extractArray(content, varName) {
 
 // script.js のテキストから SITE オブジェクトを抜き出してJSオブジェクトに変換
 function extractObject(content, varName) {
-  const re = new RegExp(`const ${varName} = (\\{[\\s\\S]*?\\});`);
+  const re = new RegExp(`(?:const|var|let) ${varName} = (\\{[\\s\\S]*?\\});`);
   const match = content.match(re);
   if (!match) return {};
   // eslint-disable-next-line no-eval
@@ -524,12 +524,12 @@ function buildUpdatedScriptContent() {
   const newOrderBlock = "var SECTION_ORDER = " + JSON.stringify(state.sectionOrder, null, 2) + ";";
 
   return state.rawContent
-    .replace(/var SITE = \{[\s\S]*?\};/, newSiteBlock)
-    .replace(/var TOPICS = \[[\s\S]*?\];/, newTopicsBlock)
-    .replace(/var EVENTS = \[[\s\S]*?\];/, newEventsBlock)
-    .replace(/var GALLERY = \[[\s\S]*?\];/, newGalleryBlock)
-    .replace(/var SECTIONS = \[[\s\S]*?\];/, newSectionsBlock)
-    .replace(/var SECTION_ORDER = \[[\s\S]*?\];/, newOrderBlock);
+    .replace(/(?:const|var|let) SITE = \{[\s\S]*?\};/, newSiteBlock)
+    .replace(/(?:const|var|let) TOPICS = \[[\s\S]*?\];/, newTopicsBlock)
+    .replace(/(?:const|var|let) EVENTS = \[[\s\S]*?\];/, newEventsBlock)
+    .replace(/(?:const|var|let) GALLERY = \[[\s\S]*?\];/, newGalleryBlock)
+    .replace(/(?:const|var|let) SECTIONS = \[[\s\S]*?\];/, newSectionsBlock)
+    .replace(/(?:const|var|let) SECTION_ORDER = \[[\s\S]*?\];/, newOrderBlock);
 }
 
 // 現在ドラフト中の内容(state)を反映したSECTIONS配列（id付き）を作る
