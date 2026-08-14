@@ -22,6 +22,8 @@
     HTMLをいじらなくても script.js の中身を書き換えるだけで反映されます。
   ・GALLERYとCONTACTの間には、SECTIONS を使って自由に新しいセクション
     （工作紹介・リンク集など）を追加できます（#custom-sections に自動挿入）。
+  ・ABOUT/TOPICS/EVENTS/GALLERYの表示順そのものも、script.js の
+    SECTION_ORDER を書き換えるだけで自由に入れ替えられます。
   ・くわしい更新手順は README.md を見てください。
   ============================================
 -->
@@ -79,7 +81,7 @@
   <!-- ABOUT -->
   <section id="about" class="section">
     <div class="section-head">
-      <span class="tag tag-teal">01 / ABOUT</span>
+      <span class="tag tag-teal" id="about-tag">01 / ABOUT</span>
       <h2>わたしたちについて</h2>
     </div>
 
@@ -105,7 +107,7 @@
   <!-- TOPICS -->
   <section id="topics" class="section section-alt">
     <div class="section-head">
-      <span class="tag tag-magenta">02 / TOPICS</span>
+      <span class="tag tag-magenta" id="topics-tag">02 / TOPICS</span>
       <h2>お知らせ</h2>
     </div>
     <p class="section-note">新しいお知らせはここに追加されます（更新は script.js の TOPICS リストで行います）</p>
@@ -118,7 +120,7 @@
   <!-- EVENTS -->
   <section id="events" class="section">
     <div class="section-head">
-      <span class="tag tag-amber">03 / EVENTS</span>
+      <span class="tag tag-amber" id="events-tag">03 / EVENTS</span>
       <h2>活動記録</h2>
     </div>
     <p class="section-note">最新のイベントはここに追加されます（更新は script.js の EVENTS リストで行います）</p>
@@ -131,7 +133,7 @@
   <!-- GALLERY -->
   <section id="gallery" class="section">
     <div class="section-head">
-      <span class="tag tag-magenta">04 / GALLERY</span>
+      <span class="tag tag-magenta" id="gallery-tag">04 / GALLERY</span>
       <h2>活動フォト</h2>
     </div>
     <p class="section-note">写真を追加する場合は images フォルダに入れて script.js でファイル名を指定してください</p>

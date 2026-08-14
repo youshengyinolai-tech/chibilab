@@ -188,6 +188,10 @@ const GALLERY = [
 // 各セクションの items は { title, body, image, link } のカード一覧です（image/linkは省略可）
 const SECTIONS = [];
 
+// ---- ページの並び順（ABOUT・お知らせ・イベント情報・ギャラリーの表示順） ----
+// この4つの並び順を入れ替えたいときは、配列の中身の順番を書き換えてください
+const SECTION_ORDER = ["about", "topics", "events", "gallery"];
+
 /* ============================================================
    ここから下は表示のしくみです。通常は触らなくて大丈夫です。
    ============================================================ */
@@ -256,11 +260,45 @@ function renderGallery() {
   `).join("");
 }
 
+// ABOUT・お知らせ・イベント情報・ギャラリーの4ブロックを、SECTION_ORDER の
+// 順番どおりに並べ替える（同じ要素を移動するだけなので、内容はそのまま）
+function applySectionOrder() {
+  const main = document.getElementById("top");
+  const anchor = document.getElementById("custom-sections");
+  if (!main || !anchor) return;
+
+  const labels = {
+    about: { name: "ABOUT", tagClass: "tag-teal" },
+    topics: { name: "TOPICS", tagClass: "tag-magenta" },
+    events: { name: "EVENTS", tagClass: "tag-amber" },
+    gallery: { name: "GALLERY", tagClass: "tag-magenta" },
+  };
+  const contactLink = document.querySelector('.site-nav a[href="#contact"]');
+
+  SECTION_ORDER.forEach((key, i) => {
+    const section = document.getElementById(key);
+    const tag = document.getElementById(key + "-tag");
+    const navLink = document.querySelector(`.site-nav a[href="#${key}"]`);
+    if (!section) return;
+
+    main.insertBefore(section, anchor);
+    if (navLink && contactLink) contactLink.parentNode.insertBefore(navLink, contactLink);
+
+    if (tag && labels[key]) {
+      const num = String(i + 1).padStart(2, "0");
+      tag.textContent = `${num} / ${labels[key].name}`;
+      tag.className = "tag " + labels[key].tagClass;
+    }
+  });
+}
+
 function renderSections() {
   const container = document.getElementById("custom-sections");
   const contactLink = document.querySelector('.site-nav a[href="#contact"]');
   const contactTag = document.getElementById("contact-tag");
   if (!container) return;
+
+  const baseNum = SECTION_ORDER.length + 1;
 
   // 前回分のナビリンクが残っていたら消してから作り直す
   document.querySelectorAll(".site-nav [data-custom-nav]").forEach(a => a.remove());
@@ -277,7 +315,7 @@ function renderSections() {
   });
 
   container.innerHTML = SECTIONS.map((s, i) => {
-    const num = String(5 + i).padStart(2, "0");
+    const num = String(baseNum + i).padStart(2, "0");
     return `
       <section id="${s.id}" class="section ${i % 2 === 0 ? "section-alt" : ""}">
         <div class="section-head">
@@ -300,7 +338,7 @@ function renderSections() {
   }).join("");
 
   if (contactTag) {
-    contactTag.textContent = String(5 + SECTIONS.length).padStart(2, "0") + " / CONTACT";
+    contactTag.textContent = String(baseNum + SECTIONS.length).padStart(2, "0") + " / CONTACT";
   }
 }
 
@@ -325,6 +363,7 @@ function initNavToggle() {
 
 document.getElementById("year").textContent = new Date().getFullYear();
 
+applySectionOrder();
 renderSite();
 renderTopics();
 renderEvents();

@@ -269,7 +269,7 @@ details summary {
 <body>
 <div class="wrap">
   <h1>chibi lab. 編集ページ</h1>
-  <p class="sub">サイトの文言・お知らせ・イベント情報・ギャラリーをここで編集して、そのまま公開サイトに反映できます。</p>
+  <p class="sub">サイトの文言・ページの並び順・お知らせ・イベント情報・ギャラリーをここで編集して、そのまま公開サイトに反映できます。</p>
 
   <!-- 接続設定 -->
   <div class="panel">
@@ -340,30 +340,40 @@ details summary {
     <input type="text" id="site-snsYoutube">
   </div>
 
+  <!-- ページの並び順 -->
+  <div class="panel" id="orderPanel" style="display:none;">
+    <h2><span class="badge" style="background:var(--magenta);">STEP 3</span> ページの並び順</h2>
+    <p class="setup-note">
+      ABOUT・お知らせ・イベント情報・ギャラリーの表示順を、ドラッグで自由に
+      入れ替えられます（並び順はナビゲーションにも反映されます）。
+    </p>
+    <div id="orderList"></div>
+  </div>
+
   <!-- お知らせ編集 -->
   <div class="panel" id="topicsPanel" style="display:none;">
-    <h2><span class="badge" style="background:var(--amber);color:var(--ink);">STEP 3</span> お知らせ</h2>
+    <h2><span class="badge" style="background:var(--amber);color:var(--ink);">STEP 4</span> お知らせ</h2>
     <div id="topicsList"></div>
     <button class="add-btn" id="addTopicBtn">＋ お知らせを追加</button>
   </div>
 
   <!-- イベント編集 -->
   <div class="panel" id="eventsPanel" style="display:none;">
-    <h2><span class="badge" style="background:var(--magenta);">STEP 4</span> イベント情報</h2>
+    <h2><span class="badge" style="background:var(--magenta);">STEP 5</span> イベント情報</h2>
     <div id="eventsList"></div>
     <button class="add-btn" id="addEventBtn">＋ イベントを追加</button>
   </div>
 
   <!-- ギャラリー編集 -->
   <div class="panel" id="galleryPanel" style="display:none;">
-    <h2><span class="badge">STEP 5</span> ギャラリー</h2>
+    <h2><span class="badge">STEP 6</span> ギャラリー</h2>
     <div id="galleryList"></div>
     <button class="add-btn" id="addPhotoBtn">＋ 写真を追加</button>
   </div>
 
   <!-- 追加セクション編集 -->
   <div class="panel" id="sectionsPanel" style="display:none;">
-    <h2><span class="badge" style="background:var(--amber);color:var(--ink);">STEP 6</span> 新しいセクション</h2>
+    <h2><span class="badge" style="background:var(--amber);color:var(--ink);">STEP 7</span> 新しいセクション</h2>
     <p class="setup-note">
       ABOUTやEVENTSと同じように、独立した新しいセクションを自由に追加できます
       （工作紹介、リンク集、クイズなど）。GALLERYとお問い合わせの間に表示され、
@@ -408,7 +418,14 @@ const SITE_FIELDS = [
   "snsX", "snsInstagram", "snsYoutube",
 ];
 
-const state = { repo: "", token: "", sha: "", site: {}, topics: [], events: [], gallery: [], sections: [] };
+const ORDER_LABELS = {
+  about: "ABOUT（わたしたちについて）",
+  topics: "TOPICS（お知らせ）",
+  events: "EVENTS（活動記録）",
+  gallery: "GALLERY（活動フォト）",
+};
+
+const state = { repo: "", token: "", sha: "", site: {}, topics: [], events: [], gallery: [], sections: [], sectionOrder: ["about", "topics", "events", "gallery"] };
 
 const el = id => document.getElementById(id);
 
@@ -442,6 +459,7 @@ function snapshotState() {
     events: state.events,
     gallery: state.gallery,
     sections: state.sections,
+    sectionOrder: state.sectionOrder,
   });
 }
 
@@ -488,10 +506,20 @@ function updateHistoryButtons() {
 
 function renderAll() {
   renderSite();
+  renderOrder();
   renderTopics();
   renderEvents();
   renderGallery();
   renderSections();
+}
+
+function renderOrder() {
+  el("orderList").innerHTML = state.sectionOrder.map((key, i) => `
+    <div class="event-card" data-idx="${i}">
+      <span class="drag-handle" title="ドラッグで並び替え">⠿⠿</span>
+      <strong>${ORDER_LABELS[key] || key}</strong>
+    </div>
+  `).join("");
 }
 
 /* ============================================================
@@ -640,6 +668,11 @@ setupListEditor(el("eventsList"), () => state.events, renderEvents);
 setupListEditor(el("galleryList"), () => state.gallery, renderGallery);
 setupSectionsEditor();
 
+makeSortable(el("orderList"), "[data-idx]", card => ({
+  list: state.sectionOrder,
+  index: Number(card.dataset.idx),
+}), renderOrder);
+
 function blankTopic() {
   return { date: "", title: "", body: "", image: "" };
 }
@@ -689,6 +722,8 @@ async function loadFromGitHub() {
     state.events = extractArray(content, "EVENTS");
     state.gallery = extractArray(content, "GALLERY");
     state.sections = extractArray(content, "SECTIONS");
+    state.sectionOrder = extractArray(content, "SECTION_ORDER");
+    if (!state.sectionOrder.length) state.sectionOrder = ["about", "topics", "events", "gallery"];
     state.rawContent = content;
 
     historyStack = [];
@@ -697,6 +732,7 @@ async function loadFromGitHub() {
 
     renderAll();
     el("sitePanel").style.display = "block";
+    el("orderPanel").style.display = "block";
     el("topicsPanel").style.display = "block";
     el("eventsPanel").style.display = "block";
     el("galleryPanel").style.display = "block";
@@ -889,13 +925,15 @@ function buildUpdatedScriptContent() {
   const newEventsBlock = "const EVENTS = " + JSON.stringify(state.events, null, 2) + ";";
   const newGalleryBlock = "const GALLERY = " + JSON.stringify(state.gallery, null, 2) + ";";
   const newSectionsBlock = "const SECTIONS = " + JSON.stringify(sectionsWithIds, null, 2) + ";";
+  const newOrderBlock = "const SECTION_ORDER = " + JSON.stringify(state.sectionOrder, null, 2) + ";";
 
   return state.rawContent
     .replace(/const SITE = \{[\s\S]*?\};/, newSiteBlock)
     .replace(/const TOPICS = \[[\s\S]*?\];/, newTopicsBlock)
     .replace(/const EVENTS = \[[\s\S]*?\];/, newEventsBlock)
     .replace(/const GALLERY = \[[\s\S]*?\];/, newGalleryBlock)
-    .replace(/const SECTIONS = \[[\s\S]*?\];/, newSectionsBlock);
+    .replace(/const SECTIONS = \[[\s\S]*?\];/, newSectionsBlock)
+    .replace(/const SECTION_ORDER = \[[\s\S]*?\];/, newOrderBlock);
 }
 
 // 保存前に、今の編集内容が実際のサイトでどう見えるかをiframeで表示する
