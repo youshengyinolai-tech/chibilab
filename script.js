@@ -262,10 +262,17 @@ function renderGallery() {
 
 // ABOUT・お知らせ・イベント情報・ギャラリーの4ブロックを、SECTION_ORDER の
 // 順番どおりに並べ替える（同じ要素を移動するだけなので、内容はそのまま）
+// ABOUT/TOPICS/EVENTS/GALLERYの固定ブロックと、STEP7で作った追加セクションを
+// まとめて1本の順番として並び替える。追加セクションは"custom"という特別な
+// キーで表し、SECTION_ORDER内のどこに置くかでABOUTなどより上にも下にも
+// 自由に移動できる（追加セクション同士の並びはSECTIONS配列の順番のまま）。
+// 古い（"custom"を含まない）SECTION_ORDERを読み込んだ場合は、これまで通り
+// 追加セクションが一番下に来るようにする。
 function applySectionOrder() {
   const main = document.getElementById("top");
-  const anchor = document.getElementById("custom-sections");
-  if (!main || !anchor) return;
+  const contactSection = document.getElementById("contact");
+  const customContainer = document.getElementById("custom-sections");
+  if (!main || !contactSection) return;
 
   const labels = {
     about: { name: "ABOUT", tagClass: "tag-teal" },
@@ -273,18 +280,36 @@ function applySectionOrder() {
     events: { name: "EVENTS", tagClass: "tag-amber" },
     gallery: { name: "GALLERY", tagClass: "tag-magenta" },
   };
+  const customTagClasses = ["tag-teal", "tag-amber", "tag-magenta"];
   const contactLink = document.querySelector('.site-nav a[href="#contact"]');
+  const order = SECTION_ORDER.includes("custom") ? SECTION_ORDER : [...SECTION_ORDER, "custom"];
 
-  // SECTION_ORDERに載っていないブロックは非表示にする（中身は消えない）
+  // SECTION_ORDERに載っていない固定ブロックは非表示にする（中身は消えない）
   Object.keys(labels).forEach(key => {
-    if (SECTION_ORDER.includes(key)) return;
+    if (order.includes(key)) return;
     const section = document.getElementById(key);
     const navLink = document.querySelector(`.site-nav a[href="#${key}"]`);
     if (section) section.style.display = "none";
     if (navLink) navLink.style.display = "none";
   });
 
-  SECTION_ORDER.forEach((key, i) => {
+  let num = 1;
+  order.forEach(key => {
+    if (key === "custom") {
+      if (customContainer) main.insertBefore(customContainer, contactSection);
+      SECTIONS.forEach((s, i) => {
+        const navLink = document.querySelector(`.site-nav [data-custom-nav][href="#${s.id}"]`);
+        if (navLink && contactLink) contactLink.parentNode.insertBefore(navLink, contactLink);
+        const tag = document.getElementById(s.id + "-tag");
+        if (tag) {
+          tag.textContent = `${String(num).padStart(2, "0")} / ${s.navLabel}`;
+          tag.className = "tag " + customTagClasses[i % customTagClasses.length];
+        }
+        num++;
+      });
+      return;
+    }
+
     const section = document.getElementById(key);
     const tag = document.getElementById(key + "-tag");
     const navLink = document.querySelector(`.site-nav a[href="#${key}"]`);
@@ -293,31 +318,33 @@ function applySectionOrder() {
     section.style.display = "";
     if (navLink) navLink.style.display = "";
 
-    main.insertBefore(section, anchor);
+    main.insertBefore(section, contactSection);
     if (navLink && contactLink) contactLink.parentNode.insertBefore(navLink, contactLink);
 
     if (tag && labels[key]) {
-      const num = String(i + 1).padStart(2, "0");
-      tag.textContent = `${num} / ${labels[key].name}`;
+      tag.textContent = `${String(num).padStart(2, "0")} / ${labels[key].name}`;
       tag.className = "tag " + labels[key].tagClass;
     }
+    num++;
   });
+
+  const contactTag = document.getElementById("contact-tag");
+  if (contactTag) contactTag.textContent = `${String(num).padStart(2, "0")} / CONTACT`;
 }
 
+// 追加セクションの中身（見出し・項目など）を作るだけで、実際の表示位置と
+// タグの番号（01/02...）はapplySectionOrder()がSECTION_ORDERを見て決める
+// （固定ブロックと通し番号で振り直すため）。この関数は必ずapplySectionOrder()
+// より先に呼ぶこと。
 function renderSections() {
   const container = document.getElementById("custom-sections");
   const contactLink = document.querySelector('.site-nav a[href="#contact"]');
-  const contactTag = document.getElementById("contact-tag");
   if (!container) return;
-
-  const baseNum = SECTION_ORDER.length + 1;
 
   // 前回分のナビリンクが残っていたら消してから作り直す
   document.querySelectorAll(".site-nav [data-custom-nav]").forEach(a => a.remove());
 
-  const tagClasses = ["tag-teal", "tag-amber", "tag-magenta"];
-
-  SECTIONS.forEach((s, i) => {
+  SECTIONS.forEach(s => {
     if (contactLink) {
       contactLink.insertAdjacentHTML(
         "beforebegin",
@@ -326,32 +353,25 @@ function renderSections() {
     }
   });
 
-  container.innerHTML = SECTIONS.map((s, i) => {
-    const num = String(baseNum + i).padStart(2, "0");
-    return `
-      <section id="${s.id}" class="section ${i % 2 === 0 ? "section-alt" : ""}">
-        <div class="section-head">
-          <span class="tag ${tagClasses[i % tagClasses.length]}">${num} / ${s.navLabel}</span>
-          <h2>${s.title}</h2>
-        </div>
-        ${s.intro ? `<p class="section-note">${s.intro}</p>` : ""}
-        <div class="items-grid">
-          ${s.items.map(it => `
-            <div class="item-card">
-              ${it.image ? `<img src="${it.image}" alt="${it.title}">` : ""}
-              <h3>${it.title}</h3>
-              <p>${it.body}</p>
-              ${it.link ? `<a class="item-link" href="${it.link}" target="_blank" rel="noopener">詳しくはこちら →</a>` : ""}
-            </div>
-          `).join("")}
-        </div>
-      </section>
-    `;
-  }).join("");
-
-  if (contactTag) {
-    contactTag.textContent = String(baseNum + SECTIONS.length).padStart(2, "0") + " / CONTACT";
-  }
+  container.innerHTML = SECTIONS.map((s, i) => `
+    <section id="${s.id}" class="section ${i % 2 === 0 ? "section-alt" : ""}">
+      <div class="section-head">
+        <span class="tag" id="${s.id}-tag"></span>
+        <h2>${s.title}</h2>
+      </div>
+      ${s.intro ? `<p class="section-note">${s.intro}</p>` : ""}
+      <div class="items-grid">
+        ${s.items.map(it => `
+          <div class="item-card">
+            ${it.image ? `<img src="${it.image}" alt="${it.title}">` : ""}
+            <h3>${it.title}</h3>
+            <p>${it.body}</p>
+            ${it.link ? `<a class="item-link" href="${it.link}" target="_blank" rel="noopener">詳しくはこちら →</a>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `).join("");
 }
 
 // モバイルメニュー開閉
@@ -375,10 +395,10 @@ function initNavToggle() {
 
 document.getElementById("year").textContent = new Date().getFullYear();
 
-applySectionOrder();
 renderSite();
 renderTopics();
 renderEvents();
 renderGallery();
 renderSections();
+applySectionOrder();
 initNavToggle();

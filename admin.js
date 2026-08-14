@@ -30,7 +30,13 @@ el("connectBtn").addEventListener("click", loadFromGitHub);
 el("addTopicBtn").addEventListener("click", () => { pushHistory(); state.topics.unshift(blankTopic()); renderTopics(); });
 el("addEventBtn").addEventListener("click", () => { pushHistory(); state.events.unshift(blankEvent()); renderEvents(); });
 el("addPhotoBtn").addEventListener("click", () => { pushHistory(); state.gallery.push(blankPhoto()); renderGallery(); });
-el("addSectionBtn").addEventListener("click", () => { pushHistory(); state.sections.push(blankSection()); renderSections(); });
+el("addSectionBtn").addEventListener("click", () => {
+  pushHistory();
+  state.sections.push(blankSection());
+  if (!state.sectionOrder.includes("custom")) state.sectionOrder.push("custom");
+  renderSections();
+  renderOrder();
+});
 el("saveBtn").addEventListener("click", saveToGitHub);
 el("previewBtn").addEventListener("click", showPreview);
 el("closePreviewBtn").addEventListener("click", closePreview);
@@ -111,13 +117,20 @@ function renderAll() {
 }
 
 function renderOrder() {
-  el("orderList").innerHTML = state.sectionOrder.map((key, i) => `
-    <div class="event-card" data-idx="${i}">
-      <span class="drag-handle" title="ドラッグで並び替え">⠿⠿</span>
-      <strong>${ORDER_LABELS[key] || key}</strong>
-      <button class="remove-btn" data-hide-section="${key}" style="position:static; margin-left:auto; display:block;">非表示にする</button>
-    </div>
-  `).join("");
+  el("orderList").innerHTML = state.sectionOrder.map((key, i) => {
+    // 追加セクション（STEP7）がまだ1つもない間は、動かす対象がないので表示しない
+    if (key === "custom" && !state.sections.length) return "";
+    const label = key === "custom" ? "追加セクション（STEP7で作った項目）" : (ORDER_LABELS[key] || key);
+    // 追加セクションは「非表示」ではなくSTEP7側で個別に削除するので、ここには消すボタンを出さない
+    const hideBtn = key === "custom" ? "" : `<button class="remove-btn" data-hide-section="${key}" style="position:static; margin-left:auto; display:block;">非表示にする</button>`;
+    return `
+      <div class="event-card" data-idx="${i}">
+        <span class="drag-handle" title="ドラッグで並び替え">⠿⠿</span>
+        <strong>${label}</strong>
+        ${hideBtn}
+      </div>
+    `;
+  }).join("");
 
   const hidden = ALL_ORDER_KEYS.filter(key => !state.sectionOrder.includes(key));
   el("hiddenOrderList").innerHTML = hidden.length ? `
@@ -383,6 +396,10 @@ async function loadFromGitHub() {
     state.sections = extractArray(content, "SECTIONS");
     state.sectionOrder = extractArray(content, "SECTION_ORDER");
     if (!state.sectionOrder.length) state.sectionOrder = ["about", "topics", "events", "gallery"];
+    // 追加セクション（STEP7）の表示位置は"custom"というキーで管理する。
+    // 古いscript.js（このキーがまだ無いもの）を読み込んだ場合は、これまで通り
+    // 一番下に来るように末尾へ足しておく
+    if (!state.sectionOrder.includes("custom")) state.sectionOrder.push("custom");
     state.rawContent = content;
 
     historyStack = [];
@@ -536,6 +553,7 @@ function setupSectionsEditor() {
       pushHistory();
       state.sections.splice(e.target.dataset.removeSection, 1);
       renderSections();
+      renderOrder();
     } else if (e.target.dataset.removeItem !== undefined) {
       pushHistory();
       const [si, ii] = e.target.dataset.removeItem.split(":");
@@ -646,12 +664,15 @@ async function showPreview() {
     win.SECTION_ORDER = state.sectionOrder;
 
     // サイト本体と全く同じ関数を、上書きしたデータで実行し直す
-    win.applySectionOrder();
+    // （renderSections()が追加セクションのDOM/タグ要素を作ってから、
+    // applySectionOrder()が固定ブロックと合わせて並び替え・番号振りをする
+    // 順番。サイト本体側のinit処理と同じ順にすること）
     win.renderSite();
     win.renderTopics();
     win.renderEvents();
     win.renderGallery();
     win.renderSections();
+    win.applySectionOrder();
 
     status.textContent = "";
     status.className = "status";
