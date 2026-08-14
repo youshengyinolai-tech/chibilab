@@ -190,7 +190,12 @@ const SECTIONS = [];
 
 // ---- ページの並び順（ABOUT・お知らせ・イベント情報・ギャラリーの表示順） ----
 // この4つの並び順を入れ替えたいときは、配列の中身の順番を書き換えてください
-const SECTION_ORDER = ["about", "topics", "events", "gallery"];
+const SECTION_ORDER = [
+  "gallery",
+  "about",
+  "topics",
+  "events"
+];
 
 /* ============================================================
    ここから下は表示のしくみです。通常は触らなくて大丈夫です。
