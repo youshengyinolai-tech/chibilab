@@ -78,6 +78,13 @@ function serializableSectionOrder() {
     .filter(Boolean);
 }
 
+// 前回入力したリポジトリ名だけ覚えておく（トークンは安全のため保存しない）
+const REMEMBERED_REPO_KEY = "chibilab-admin-repo";
+try {
+  const rememberedRepo = localStorage.getItem(REMEMBERED_REPO_KEY);
+  if (rememberedRepo) el("repoInput").value = rememberedRepo;
+} catch (e) { /* localStorageが使えない環境では何もしない */ }
+
 el("connectBtn").addEventListener("click", loadFromGitHub);
 el("addTopicBtn").addEventListener("click", () => { pushHistory(); state.topics.unshift(blankTopic()); renderTopics(); });
 el("addEventBtn").addEventListener("click", () => { pushHistory(); state.events.unshift(blankEvent()); renderEvents(); });
@@ -107,6 +114,7 @@ el("restoreBtn").addEventListener("click", restoreOriginal);
 
 let historyStack = [];
 let originalSnapshot = null;
+let hasUnsavedChanges = false;
 const MAX_HISTORY = 50;
 
 function snapshotState() {
@@ -123,7 +131,76 @@ function snapshotState() {
 function pushHistory() {
   historyStack.push(snapshotState());
   if (historyStack.length > MAX_HISTORY) historyStack.shift();
+  hasUnsavedChanges = true;
   updateHistoryButtons();
+}
+
+// タブを閉じる・別ページに移動する前に、保存し忘れた変更があれば警告する
+window.addEventListener("beforeunload", e => {
+  if (!hasUnsavedChanges) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+
+// Cmd/Ctrl+Sでも「保存してサイトに反映」を実行できるようにする
+window.addEventListener("keydown", e => {
+  if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "s") return;
+  if (el("saveBar").style.display === "none") return;
+  e.preventDefault();
+  if (!el("saveBtn").disabled) saveToGitHub();
+});
+
+/* ============================================================
+   下書きの自動保存
+   ------------------------------------------------------------
+   保存し忘れたままタブを閉じたりブラウザが落ちたりしても、編集内容を
+   ブラウザのlocalStorageに数秒おきに書き残しておき、次に同じリポジトリを
+   読み込んだときに「復元しますか？」と聞けるようにする。トークンなどの
+   認証情報は一切保存しない（保存されるのはSITE/TOPICS/EVENTS/GALLERY/
+   SECTIONS/SECTION_ORDERの中身だけ）。
+   ============================================================ */
+const DRAFT_KEY = "chibilab-admin-draft";
+let lastDraftSnapshot = null;
+
+function saveDraft() {
+  if (!state.repo) return;
+  const snap = snapshotState();
+  if (snap === lastDraftSnapshot) return;
+  lastDraftSnapshot = snap;
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ repo: state.repo, savedAt: Date.now(), snapshot: snap }));
+  } catch (e) { /* 容量オーバー等で保存できなくても致命的ではないので無視する */ }
+}
+
+function clearDraft() {
+  lastDraftSnapshot = null;
+  try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* noop */ }
+}
+
+setInterval(saveDraft, 4000);
+
+// 今読み込んだリポジトリに対応する下書きが残っていれば、復元するか確認する
+function maybeRestoreDraft() {
+  let raw;
+  try { raw = localStorage.getItem(DRAFT_KEY); } catch (e) { return; }
+  if (!raw) return;
+
+  let draft;
+  try { draft = JSON.parse(raw); } catch (e) { return; }
+  if (!draft || draft.repo !== state.repo || !draft.snapshot) return;
+  if (draft.snapshot === snapshotState()) return; // 今読み込んだ内容と同じなら何もしない
+
+  const when = draft.savedAt ? new Date(draft.savedAt).toLocaleString("ja-JP") : "";
+  const ok = confirm(
+    `保存し忘れた編集内容が残っています${when ? `（${when}時点）` : ""}。復元しますか？\n` +
+    "「キャンセル」を押すと、今読み込んだ内容のまま進みます。"
+  );
+  if (!ok) { clearDraft(); return; }
+
+  pushHistory();
+  const snap = JSON.parse(draft.snapshot);
+  Object.assign(state, snap);
+  state.nextSectionKey = state.sections.reduce((max, s) => Math.max(max, s._key || 0), 0) + 1;
 }
 
 // テキスト入力は1文字ごとに履歴を積まない。編集が始まった瞬間（＝直前の
@@ -153,6 +230,8 @@ function restoreOriginal() {
   const snap = JSON.parse(originalSnapshot);
   Object.assign(state, snap);
   historyStack = [];
+  hasUnsavedChanges = false;
+  clearDraft();
   renderAll();
   updateHistoryButtons();
 }
@@ -367,6 +446,7 @@ function setupListEditor(container, getArray, rerender) {
     if (idx === undefined) return;
     pushHistoryForTextEdit(e);
     getArray()[idx][e.target.dataset.field] = e.target.value;
+    if (e.target.dataset.field === "image") updateImageThumb(e.target);
   });
 
   container.addEventListener("click", e => {
@@ -394,6 +474,13 @@ setupListEditor(el("topicsList"), () => state.topics, renderTopics);
 setupListEditor(el("eventsList"), () => state.events, renderEvents);
 setupListEditor(el("galleryList"), () => state.gallery, renderGallery);
 setupSectionsEditor();
+
+wireImageUpload(el("topicsList"), (target, path) => { state.topics[target.dataset.uploadIdx].image = path; }, renderTopics);
+wireImageUpload(el("galleryList"), (target, path) => { state.gallery[target.dataset.uploadIdx].image = path; }, renderGallery);
+wireImageUpload(el("sectionsList"), (target, path) => {
+  const [si, ii] = target.dataset.uploadIt.split(":");
+  state.sections[si].items[ii].image = path;
+}, renderSections);
 
 makeSortable(el("orderList"), "[data-idx]", card => ({
   list: state.sectionOrder,
@@ -462,6 +549,8 @@ async function loadFromGitHub() {
     const data = await res.json();
     const content = decodeURIComponent(escape(atob(data.content)));
 
+    try { localStorage.setItem(REMEMBERED_REPO_KEY, repo); } catch (e) { /* 保存できなくても致命的ではない */ }
+
     state.repo = repo;
     state.token = token;
     state.sha = data.sha;
@@ -480,7 +569,9 @@ async function loadFromGitHub() {
 
     historyStack = [];
     originalSnapshot = snapshotState();
+    hasUnsavedChanges = false;
     updateHistoryButtons();
+    maybeRestoreDraft();
 
     renderAll();
     el("sitePanel").style.display = "block";
@@ -536,6 +627,7 @@ function renderTopics() {
       <textarea data-idx="${i}" data-field="body" placeholder="お知らせの内容">${escapeHtml(t.body)}</textarea>
       <label>画像ファイル名（任意。images/フォルダに入れたファイル名）</label>
       <input type="text" data-idx="${i}" data-field="image" value="${escapeAttr(t.image)}" placeholder="images/topic01.jpg">
+      ${imageUploadWidgetHtml(`data-upload-idx="${i}"`, t.image)}
     </div>
   `).join("");
 }
@@ -572,6 +664,7 @@ function renderGallery() {
       <input type="text" data-idx="${i}" data-field="caption" value="${escapeAttr(g.caption)}" placeholder="サイエンスショーの様子">
       <label>画像ファイル名（images/フォルダに入れたファイル名。空欄なら色プレースホルダー）</label>
       <input type="text" data-idx="${i}" data-field="image" value="${escapeAttr(g.image)}" placeholder="images/event01.jpg">
+      ${imageUploadWidgetHtml(`data-upload-idx="${i}"`, g.image)}
     </div>
   `).join("");
 }
@@ -599,6 +692,7 @@ function renderSections() {
             <textarea data-it="${si}:${ii}" data-field="body" placeholder="説明文">${escapeHtml(it.body)}</textarea>
             <label>画像ファイル名（任意）</label>
             <input type="text" data-it="${si}:${ii}" data-field="image" value="${escapeAttr(it.image)}" placeholder="images/xxx.jpg">
+            ${imageUploadWidgetHtml(`data-upload-it="${si}:${ii}"`, it.image)}
             <label>リンクURL（任意）</label>
             <input type="text" data-it="${si}:${ii}" data-field="link" value="${escapeAttr(it.link)}" placeholder="https://...">
           </div>
@@ -623,6 +717,7 @@ function setupSectionsEditor() {
       pushHistoryForTextEdit(e);
       const [si, ii] = e.target.dataset.it.split(":");
       state.sections[si].items[ii][e.target.dataset.field] = e.target.value;
+      if (e.target.dataset.field === "image") updateImageThumb(e.target);
     }
   });
 
@@ -664,6 +759,102 @@ function slugify(str, fallback) {
 
 function escapeHtml(s) { return (s || "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
 function escapeAttr(s) { return (s || "").replace(/"/g, "&quot;"); }
+
+// "owner/repo" 形式のリポジトリ名から、GitHub Pagesの公開URLを組み立てる
+function pagesUrlFromRepo(repo) {
+  const [owner, name] = (repo || "").split("/");
+  if (!owner || !name) return null;
+  return `https://${owner}.github.io/${name}/`;
+}
+
+// 画像ファイル名を入力する欄の下に、サムネイル表示＋アップロードボタンを
+// 添える。dataAttrsはテキスト欄と同じ data-idx/data-it + data-field を
+// そのままサムネイル・ファイル選択にも付けておき、後でどの項目の画像かを
+// 特定できるようにする
+// uploadAttrsは data-upload-idx や data-upload-it など、ファイル選択時に
+// state内のどの項目を更新すればよいかを識別するための属性。
+// あえてテキスト欄と同じ data-idx/data-it を使わないのは、
+// <input type="file"> も input/change イベントを発火するため、既存の
+// テキスト同期用の委任リスナーに誤って拾われてしまうのを避けるため
+function imageUploadWidgetHtml(uploadAttrs, value) {
+  return `
+    <div class="image-field-row">
+      <img class="image-thumb" src="${value ? escapeAttr(value) : ""}" style="${value ? "" : "display:none;"}" onerror="this.style.display='none'">
+      <label class="image-upload-btn">
+        画像を選ぶ
+        <input type="file" accept="image/*" class="image-upload-input" ${uploadAttrs} style="display:none;">
+      </label>
+      <span class="image-upload-status"></span>
+    </div>
+  `;
+}
+
+// 画像ファイル名の欄を手入力で書き換えたときも、隣のサムネイルをその場で
+// 更新する（imageUploadWidgetHtmlがテキスト欄の直後に置かれている前提）
+function updateImageThumb(inputEl) {
+  const row = inputEl.nextElementSibling;
+  if (!row || !row.classList.contains("image-field-row")) return;
+  const thumb = row.querySelector(".image-thumb");
+  if (!thumb) return;
+  const value = inputEl.value.trim();
+  thumb.style.display = value ? "" : "none";
+  thumb.src = value;
+}
+
+// 選んだファイルをGitHubリポジトリのimages/フォルダへ直接アップロードし、
+// 保存されたパス（例: images/1699999999-photo.jpg）を返す
+async function uploadImageFile(file) {
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("ファイルの読み込みに失敗しました"));
+    reader.readAsDataURL(file);
+  });
+  const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+  const safeName = file.name.toLowerCase().replace(/[^a-z0-9.\-_]+/g, "-");
+  const path = `images/${Date.now()}-${safeName}`;
+
+  const res = await fetch(`https://api.github.com/repos/${state.repo}/contents/${path}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${state.token}`,
+      Accept: "application/vnd.github+json",
+    },
+    body: JSON.stringify({
+      message: `admin: 画像を追加 (${path})`,
+      content: base64,
+    }),
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.message || `アップロードに失敗しました（${res.status}）`);
+  }
+  return path;
+}
+
+// container内の「画像を選ぶ」ファイル入力の変更を拾い、アップロード完了後に
+// setImagePath(target, path)でstateを更新してrerenderする
+function wireImageUpload(container, setImagePath, rerender) {
+  container.addEventListener("change", async e => {
+    if (!e.target.classList.contains("image-upload-input")) return;
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const statusEl = e.target.closest(".image-field-row").querySelector(".image-upload-status");
+    statusEl.textContent = "アップロード中…";
+    statusEl.className = "image-upload-status busy";
+
+    try {
+      const path = await uploadImageFile(file);
+      pushHistory();
+      setImagePath(e.target, path);
+      rerender();
+    } catch (err) {
+      statusEl.textContent = "エラー: " + err.message;
+      statusEl.className = "image-upload-status err";
+    }
+  });
+}
 
 // state.site/topics/events/gallery の今の内容を反映した script.js 全文を組み立てる
 // （保存とプレビューの両方から使う）
@@ -798,8 +989,12 @@ async function saveToGitHub() {
     const data = await res.json();
     state.sha = data.content.sha;
     state.rawContent = newContent;
+    hasUnsavedChanges = false;
+    clearDraft();
 
-    status.textContent = "保存しました ✓（数分でサイトに反映されます）";
+    const pagesUrl = pagesUrlFromRepo(state.repo);
+    status.innerHTML = "保存しました ✓（数分でサイトに反映されます）" +
+      (pagesUrl ? ` <a href="${escapeAttr(pagesUrl)}" target="_blank" rel="noopener">公開サイトを見る →</a>` : "");
     status.className = "status ok";
   } catch (e) {
     status.textContent = "エラー: " + e.message;

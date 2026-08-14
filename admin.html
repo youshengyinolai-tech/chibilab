@@ -163,6 +163,41 @@ input:focus, textarea:focus {
 
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
+.image-field-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.image-thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: var(--paper);
+}
+.image-upload-btn {
+  display: inline-block;
+  padding: 8px 14px;
+  border: 1.5px dashed var(--ink-soft);
+  border-radius: 8px;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.image-upload-btn:hover { border-color: var(--teal); color: var(--teal-dark); }
+.image-upload-status {
+  font-size: 0.8rem;
+  font-family: monospace;
+  color: var(--ink-soft);
+}
+.image-upload-status.busy { color: var(--teal-dark); }
+.image-upload-status.err { color: var(--magenta); }
+
 .save-bar {
   position: sticky;
   bottom: 0;
