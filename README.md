@@ -21,6 +21,8 @@ style.css    … 見た目（色・フォント・レイアウト）はすべて
 script.js    … サイトの文言・お知らせ・イベント情報・ギャラリー写真は
                 ここのSITE/TOPICS/EVENTS/GALLERYを書き換えるだけでOK
 admin.html   … 非エンジニアでもブラウザだけでscript.jsを編集・公開できる管理ページ
+admin.js     … admin.htmlの動作本体（見た目と処理を分けてあるだけで、常に
+                admin.htmlとセットで使う）
 images/      … ギャラリー写真置き場
 images/brand/… ロゴ・マスコット「ラボくま君」の画像（差し替え不要。ヘッダー・
                 トップページ・お問い合わせ欄で使用）

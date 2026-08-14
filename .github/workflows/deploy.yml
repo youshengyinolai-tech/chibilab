@@ -29,6 +29,7 @@ jobs:
         run: |
           sed -i "s/style\.css\"/style.css?v=${{ github.sha }}\"/" index.html
           sed -i "s/script\.js\"/script.js?v=${{ github.sha }}\"/" index.html
+          sed -i "s/admin\.js\"/admin.js?v=${{ github.sha }}\"/" admin.html
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
