@@ -135,11 +135,44 @@ function renderOrder() {
    ============================================================ */
 const NON_DRAGGABLE_SELECTOR = "input, textarea, select, button, a";
 
+// cardSelector（例: "[data-idx]"）は、カード自身だけでなく、カード内の
+// 各入力欄（日付・タイトル・本文…）にも同じdata-idx属性が付いているため、
+// 素朴に closest()/querySelectorAll() すると入力欄までヒットしてしまい、
+// ドラッグ中のアニメーションやハイライトが違う要素に適用されてしまう
+// （特に入力欄の多いTOPICSで顕著）。「他のマッチの中に入れ子になっていない、
+// 一番外側のカード」だけに絞り込むためのヘルパー
+function closestChildCard(startEl, container, cardSelector) {
+  let node = startEl.closest(cardSelector);
+  if (!node || !container.contains(node)) return null;
+  for (;;) {
+    const parent = node.parentElement;
+    if (!parent || parent === container || !container.contains(parent)) return node;
+    const outer = parent.closest(cardSelector);
+    if (!outer || !container.contains(outer)) return node;
+    node = outer;
+  }
+}
+
+// container内でcardSelectorに一致する要素のうち、入れ子になっていない
+// 最も外側のものだけを返す（querySelectorAllの入力欄誤ヒット対策）
+function topLevelCards(container, cardSelector) {
+  const all = Array.from(container.querySelectorAll(cardSelector));
+  const set = new Set(all);
+  return all.filter(elm => {
+    let p = elm.parentElement;
+    while (p && p !== container) {
+      if (set.has(p)) return false;
+      p = p.parentElement;
+    }
+    return true;
+  });
+}
+
 function makeSortable(container, cardSelector, getLocation, rerender, excludeSelector) {
   container.addEventListener("pointerdown", e => {
     if (e.target.closest(NON_DRAGGABLE_SELECTOR)) return;
     if (excludeSelector && e.target.closest(excludeSelector)) return;
-    const card = e.target.closest(cardSelector);
+    const card = closestChildCard(e.target, container, cardSelector);
     if (!card || !container.contains(card)) return;
 
     e.preventDefault();
@@ -153,7 +186,7 @@ function makeSortable(container, cardSelector, getLocation, rerender, excludeSel
 
     function onMove(ev) {
       const elAtPoint = document.elementFromPoint(ev.clientX, ev.clientY);
-      const overCard = elAtPoint && elAtPoint.closest(cardSelector);
+      const overCard = elAtPoint && closestChildCard(elAtPoint, container, cardSelector);
       if (!overCard || !container.contains(overCard)) return;
 
       const overLoc = getLocation(overCard);
@@ -172,7 +205,7 @@ function makeSortable(container, cardSelector, getLocation, rerender, excludeSel
       rerender();
       finishAnimation();
 
-      const newCards = container.querySelectorAll(cardSelector);
+      const newCards = topLevelCards(container, cardSelector);
       if (newCards[overLoc.index]) newCards[overLoc.index].classList.add("card-dragging");
     }
 
@@ -196,10 +229,10 @@ function makeSortable(container, cardSelector, getLocation, rerender, excludeSel
 // 実際どれだけ動いたかを計算して、逆方向にずらした状態から元の位置へ
 // スッと戻すことで「動いた」ことが視覚的にわかるようにする
 function prepareSlideAnimation(container, cardSelector, fromIndex, toIndex) {
-  const oldRects = Array.from(container.querySelectorAll(cardSelector)).map(c => c.getBoundingClientRect());
+  const oldRects = topLevelCards(container, cardSelector).map(c => c.getBoundingClientRect());
 
   return () => {
-    const newCards = Array.from(container.querySelectorAll(cardSelector));
+    const newCards = topLevelCards(container, cardSelector);
     newCards.forEach((card, newIndex) => {
       let oldIndex;
       if (newIndex === toIndex) {
