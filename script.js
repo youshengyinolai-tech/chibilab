@@ -275,11 +275,23 @@ function applySectionOrder() {
   };
   const contactLink = document.querySelector('.site-nav a[href="#contact"]');
 
+  // SECTION_ORDERに載っていないブロックは非表示にする（中身は消えない）
+  Object.keys(labels).forEach(key => {
+    if (SECTION_ORDER.includes(key)) return;
+    const section = document.getElementById(key);
+    const navLink = document.querySelector(`.site-nav a[href="#${key}"]`);
+    if (section) section.style.display = "none";
+    if (navLink) navLink.style.display = "none";
+  });
+
   SECTION_ORDER.forEach((key, i) => {
     const section = document.getElementById(key);
     const tag = document.getElementById(key + "-tag");
     const navLink = document.querySelector(`.site-nav a[href="#${key}"]`);
     if (!section) return;
+
+    section.style.display = "";
+    if (navLink) navLink.style.display = "";
 
     main.insertBefore(section, anchor);
     if (navLink && contactLink) contactLink.parentNode.insertBefore(navLink, contactLink);

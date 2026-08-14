@@ -20,6 +20,7 @@ const ORDER_LABELS = {
   events: "EVENTS（活動記録）",
   gallery: "GALLERY（活動フォト）",
 };
+const ALL_ORDER_KEYS = Object.keys(ORDER_LABELS);
 
 const state = { repo: "", token: "", sha: "", site: {}, topics: [], events: [], gallery: [], sections: [], sectionOrder: ["about", "topics", "events", "gallery"] };
 
@@ -114,9 +115,30 @@ function renderOrder() {
     <div class="event-card" data-idx="${i}">
       <span class="drag-handle" title="ドラッグで並び替え">⠿⠿</span>
       <strong>${ORDER_LABELS[key] || key}</strong>
+      <button class="remove-btn" data-hide-section="${key}" style="position:static; margin-left:auto; display:block;">非表示にする</button>
     </div>
   `).join("");
+
+  const hidden = ALL_ORDER_KEYS.filter(key => !state.sectionOrder.includes(key));
+  el("hiddenOrderList").innerHTML = hidden.length ? `
+    <p class="setup-note" style="margin-bottom:8px;">非表示中：</p>
+    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+      ${hidden.map(key => `
+        <button class="add-btn" data-show-section="${key}" style="width:auto; margin:0; padding:8px 14px;">
+          ＋ ${ORDER_LABELS[key] || key}を表示する
+        </button>
+      `).join("")}
+    </div>
+  ` : "";
 }
+
+el("hiddenOrderList").addEventListener("click", e => {
+  const key = e.target.dataset.showSection;
+  if (key === undefined) return;
+  pushHistory();
+  state.sectionOrder.push(key);
+  renderOrder();
+});
 
 /* ============================================================
    ドラッグ並び替え（Pointer Events版）
@@ -301,6 +323,14 @@ makeSortable(el("orderList"), "[data-idx]", card => ({
   list: state.sectionOrder,
   index: Number(card.dataset.idx),
 }), renderOrder);
+
+el("orderList").addEventListener("click", e => {
+  const key = e.target.dataset.hideSection;
+  if (key === undefined) return;
+  pushHistory();
+  state.sectionOrder.splice(state.sectionOrder.indexOf(key), 1);
+  renderOrder();
+});
 
 function blankTopic() {
   return { date: "", title: "", body: "", image: "" };
